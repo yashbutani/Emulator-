@@ -52,7 +52,6 @@ def handle_packets(sock, args):
         sender_addr = f"{addr[0]}:{addr[1]}"
         key = sender_addr
 
-      #  data_end =False
 
         if key not in sender_stats:
             sender_stats[key] = {

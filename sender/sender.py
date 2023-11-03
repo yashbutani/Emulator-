@@ -5,7 +5,12 @@ import struct
 import os
 from datetime import datetime
 
-def send_file(s, filename, dest_addr, rate, seq_no, length):
+def send_to_emulator(s, final_packet, dest_host, dest_port):
+    s.sendto(final_packet, (dest_host, dest_port))
+    pass
+
+def get_packet(s, filename, dest_addr, rate, seq_no, length, priority):
+    
 # UPDATE SENDER SO IT CAN:
 # 1. Always start at sequence number 1
 # 2. Increment the sequence number by 1 for each packet sent, instead of by the packet length
@@ -22,6 +27,8 @@ def send_file(s, filename, dest_addr, rate, seq_no, length):
         print(f"File {filename} not found!")
         return
 
+    total_length = 0
+    final_size = 0
     with open(filename, 'rb') as file:
         while True:
             data = file.read(length)
@@ -29,14 +36,17 @@ def send_file(s, filename, dest_addr, rate, seq_no, length):
                 print("\nEND Packet")
                 # Sending the END packet
                 header = struct.pack('!cII', b'E', socket.htonl(seq_no), 0)
-                s.sendto(header, dest_addr)
+                final_size = total_length + len(header)
+                # s.sendto(header, dest_addr) wait
                 current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
                 print(f"send time:\t{current_time}\nrequester addr:\t{address}\nSequence num::\t{seq_no}\nlength:\t\t0\npayload:\t\n")
                 break
             
             header = struct.pack('!cII', b'D', socket.htonl(seq_no), len(data))
             packet = header + data
-            s.sendto(packet, dest_addr)
+            total_length = len(packet)
+
+          #  s.sendto(packet, dest_addr) # wait to send... i think
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
             # Print the sender's log
@@ -45,6 +55,16 @@ def send_file(s, filename, dest_addr, rate, seq_no, length):
             
             seq_no += 1
             time.sleep(1.0/rate)
+
+    length = len(final_size)
+    src_addr, src_port = s.getsockname()
+    packed_data = struct.pack('!BIHIIHI', priority, src_addr, src_port, dest_addr[0], dest_addr[1], length)
+    final_packet = packed_data + header + data
+    print(final_packet)
+    return final_packet
+    
+
+    
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -73,16 +93,22 @@ if __name__ == '__main__':
         transmissions = 0
         retransmissions = 0
         try:
+            # TODO for timeout using args.t
+           # The sender keeps this set of data in a buffer, and keeps a timeout for each of the packets. 
+           # If it does not receive an ack for a packet and its timeout expires, it will retransmit that packet. 
+           # The timeout is fixed and is specified by one of the sender's parameters.
             while True:
                 
                 # Listen for incoming request packets
                 data, addr = s.recvfrom(4096)
                 packet_type, _, _ = struct.unpack('!cII', data[:9])
                 if packet_type == b'R':
+
                     requested_file = data[9:].decode()
                     print('file',requested_file)
-                    send_file(s, requested_file, (addr[0], args.g), args.r, args.q, args.l)
 
+                    final_packet = get_packet(s, requested_file, (addr[0], args.g), args.r, args.q, args.l, args.i)
+                    send_to_emulator(s, final_packet, args.f, args.e)
                     # determine if a retransmission occur
                     if (1 == 2):
                         retransmissions += 1
