@@ -127,6 +127,9 @@ def main():
             parser = argparse.ArgumentParser(description="UDP File Requester")
             parser.add_argument("-p", "--port", type=int, required=True, help="Port to bind to")
             parser.add_argument("-o", "--file", type=str, required=True, help="File to request")
+            parser.add_argument("-f", "--hostname", type=int, required=True, help="The host name of the emulator.")
+            parser.add_argument("-e", "--e_port", type=str, required=True, help="The port of the emulator.")
+            parser.add_argument("-w", "--window", type=str, required=True, help="The requester's window size.")
             args = parser.parse_args()
 
             s.bind((socket.gethostname(), args.port))

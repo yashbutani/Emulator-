@@ -15,7 +15,7 @@ def send_file(s, filename, dest_addr, rate, seq_no, length):
 # where total number of transmissions including both normal transmissions and retransmissions.
 # 3. The end packet is sent after ensuring that all data packets have been received by the receiver 
 # (or if max number of retries have reached for sending all packets in the last window).
- 
+    
     address = f"{dest_addr[0]}:{dest_addr[1]}"
 
     if not os.path.exists(filename):
@@ -68,9 +68,11 @@ if __name__ == '__main__':
         s.bind((socket.gethostname(), args.p))
         print('----------------------------')
         print("sender1's print information:")
-
+        transmissions = 0
+        retransmissions = 0
         try:
             while True:
+                
                 # Listen for incoming request packets
                 data, addr = s.recvfrom(4096)
                 packet_type, _, _ = struct.unpack('!cII', data[:9])
@@ -79,7 +81,14 @@ if __name__ == '__main__':
                     print('file',requested_file)
                     send_file(s, requested_file, (addr[0], args.g), args.r, args.q, args.l)
 
+                    # determine if a retransmission occur
+                    if (1 == 2):
+                        retransmissions += 1
+                    transmissions += 1
+
         except KeyboardInterrupt:
             print("\nShutting down sender...")
         finally:
             s.close()
+
+        print(retransmissions/transmissions)
