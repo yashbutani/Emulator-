@@ -6,28 +6,70 @@ import os
 from datetime import datetime
 from queue import PriorityQueue
 
-def rounting(filename):
-    match = False
-    table = []
-    destination = 1
-    # read 
-    with open(filename, 'r') as file:
-        for line in file:
-            content = line.split()
-            entry_names = []
-            for word in content:
-                entry_names.append(word)
-            table.append(entry_names)
+class Emulator:
+    def __init__(self, port, queue_size, forwarding_table, log_file):
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.socket.bind((socket.gethostname(), port))
+        print(socket.gethostname())
+        self.socket.setblocking(False) # TODO may need blocking? not sure 
+        self.queue = [[] for _ in range(3)]  # TODO fix inital priority queue PriorityQueue(maxsize=queue_size)#
+        self.queue_size = queue_size
+        self.forwarding_table = forwarding_table
+        self.log_file = log_file
 
-    print(table)
+    def log(self, message):
+        # Log events to a file
+        # ...
+        pass
 
-    # compare destination of incoming packet to forwarding table
-    for entry in table:
-        if entry[1] == destination:
-            print("Queue packet for forwarding to the next hop")
-        else:
+    def route_packet(self, packet):
+        # compare destination of incoming packet to forwarding table
+        destination = -1 # get destination from sender
+        for entry in self.forwarding_table:
+            if entry[1] == destination:
+                print("Queue packet for forwarding to the next hop")
+            else:
             # drop packet and event should be logged
-            logging()
+                self.log("FAILURE")
+        # Decide packet forwarding based on the static table
+        # ...
+        pass
+
+    def send_packet(self, packet, destination):
+        # TODO get sender info from forwarding table -> not hardcoded
+        #data, addr = self.socket.recvfrom(4096)
+        packet_type, _, _ = struct.unpack('!cII', packet[:9])
+        if packet_type == b'R': # means it was a request packet so need to call sender from the emulator
+            requested_file = packet[9:].decode()
+            print('file',requested_file)
+
+            self.socket.sendto(packet, ('Jacks-MacBook-Air.local', 5000))
+
+        # Simulate network conditions and send packet
+        # ...
+        pass
+
+    def run(self):
+        print(self.forwarding_table)
+        print(self.queue_size)
+        print(self.log_file)
+        while True:
+            try:
+                packet, addr = self.socket.recvfrom(1024)
+                print(packet)
+                self.send_packet(packet, 1) # TODO will be moved in the for loop on the bottom; testing right now
+                self.route_packet(packet) # TODO will either route a sender or receiver
+            except socket.error:
+                pass
+
+            for priority_queue in self.queue:
+                if priority_queue:
+                    print("test")
+                    packet = priority_queue.pop(0)
+                    # ... send_packet() ...
+                    time.sleep(0.01)
+
+
 
 # Routing function:
 # The routing function is based on the static forwarding table that you provide to your program 
@@ -69,36 +111,36 @@ def logging():
 # the priority level of the packet, and the size of the payload.
     
 
-def send_file(s, filename, dest_addr, rate, seq_no, length):
-    address = f"{dest_addr[0]}:{dest_addr[1]}"
+# def send_file(s, filename, dest_addr, rate, seq_no, length):
+#     address = f"{dest_addr[0]}:{dest_addr[1]}"
 
-    if not os.path.exists(filename):
-        print(f"File {filename} not found!")
-        return
+#     if not os.path.exists(filename):
+#         print(f"File {filename} not found!")
+#         return
 
-    with open(filename, 'rb') as file:
-        while True:
-            data = file.read(length)
-            if not data:
-                print("\nEND Packet")
-                # Sending the END packet
-                header = struct.pack('!cII', b'E', socket.htonl(seq_no), 0)
-                s.sendto(header, dest_addr)
-                current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-                print(f"send time:\t{current_time}\nrequester addr:\t{address}\nSequence num::\t{seq_no}\nlength:\t\t0\npayload:\t\n")
-                break
+#     with open(filename, 'rb') as file:
+#         while True:
+#             data = file.read(length)
+#             if not data:
+#                 print("\nEND Packet")
+#                 # Sending the END packet
+#                 header = struct.pack('!cII', b'E', socket.htonl(seq_no), 0)
+#                 s.sendto(header, dest_addr)
+#                 current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+#                 print(f"send time:\t{current_time}\nrequester addr:\t{address}\nSequence num::\t{seq_no}\nlength:\t\t0\npayload:\t\n")
+#                 break
             
-            header = struct.pack('!cII', b'D', socket.htonl(seq_no), len(data))
-            packet = header + data
-            s.sendto(packet, dest_addr)
-            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+#             header = struct.pack('!cII', b'D', socket.htonl(seq_no), len(data))
+#             packet = header + data
+#             s.sendto(packet, dest_addr)
+#             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
-            # Print the sender's log
-            print("\nDATA Packet")
-            print(f"send time:\t{current_time}\nrequester addr:\t{address}\nSequence num::\t{seq_no}\nlength:\t\t{len(data)}\npayload:\t{data[:4].decode('utf-8', 'ignore')}")
+#             # Print the sender's log
+#             print("\nDATA Packet")
+#             print(f"send time:\t{current_time}\nrequester addr:\t{address}\nSequence num::\t{seq_no}\nlength:\t\t{len(data)}\npayload:\t{data[:4].decode('utf-8', 'ignore')}")
             
-            seq_no += len(data)
-            time.sleep(1.0/rate)
+#             seq_no += len(data)
+#             time.sleep(1.0/rate)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -107,36 +149,47 @@ if __name__ == '__main__':
     parser.add_argument('-f', type=str, required=True, help='The name of the file containing the static forwarding table.')
     parser.add_argument('-l', type=str, required=True, help='The name of the log file.')
     args = parser.parse_args()
-    
-    high = PriorityQueue(maxsize=args[1])
-    medium = PriorityQueue(maxsize=args[1])
-    low = PriorityQueue(maxsize=args[1])
 
     # Check port range validity
     if not (2049 < args.p < 65536):
         print("Error: Port number must be in the range 2050 to 65535.")
         exit(1)
 
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        s.bind((socket.gethostname(), args.p))
-        print('----------------------------')
-        print("emualtor's print information:")
-        rounting(args.f)
+    # read forwarding table file
+    forwarding_table = []
+    with open(args.f, 'r') as file:
+        for line in file:
+            content = line.split()
+            entry_names = []
+            for word in content:
+                entry_names.append(word)
+            forwarding_table.append(entry_names)
 
-        try:
-            while True:
-                # Listen for incoming request packets
-                data, addr = s.recvfrom(4096)
-                packet_type, _, _ = struct.unpack('!cII', data[:9])
-                rounting(args.f)
+    # initialize and create emulator
+    emulator = Emulator(args.p, args.q, forwarding_table, args.l)
+    emulator.run() # constantly running in the background
 
-                if packet_type == b'R':
-                    requested_file = data[9:].decode()
-                    print('file',requested_file)
 
-                    #send_file(s, requested_file, (addr[0], args.g), args.r, args.q, args.l)
+    # with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+    #     s.bind((socket.gethostname(), args.p))
+    #     print('----------------------------')
+    #     print("emualtor's print information:")
+    #     rounting(args.f)
 
-        except KeyboardInterrupt:
-            print("\nShutting down sender...")
-        finally:
-            s.close()
+    #     try:
+    #         while True:
+    #             # Listen for incoming request packets
+    #             data, addr = s.recvfrom(4096)
+    #             packet_type, _, _ = struct.unpack('!cII', data[:9])
+    #             rounting(args.f)
+
+    #             if packet_type == b'R':
+    #                 requested_file = data[9:].decode()
+    #                 print('file',requested_file)
+
+    #                 #send_file(s, requested_file, (addr[0], args.g), args.r, args.q, args.l)
+
+    #     except KeyboardInterrupt:
+    #         print("\nShutting down sender...")
+    #     finally:
+    #         s.close()

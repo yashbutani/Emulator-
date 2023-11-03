@@ -7,14 +7,11 @@ from datetime import datetime
 
 
 class Tracker:
-    def __init__(self, priority, src_ip, source_port, dest_ip, dest_port, length, filename, seq_no, hostname, port):
+    def __init__(self, filename, seq_no, hostname, port):
         self.filename = filename
         self.seq_no = seq_no
         self.hostname = hostname
         self.port = port
-        self.priority = priority
-        self.src_ip = src_ip
-        self.source_port = source_port
         
 
 
@@ -31,12 +28,13 @@ def send_requests(trackers, sock, args):
     seq_num = socket.htonl(0)
     length = socket.htonl(0)
     packet = struct.pack("!cII", packet_type, seq_num, length) + args.file.encode()
+    sock.sendto(packet, (args.hostname, args.e_port))
 
-    for tracker in trackers:
-        if args.file == tracker.filename:
-            sock.sendto(packet, (tracker.hostname, tracker.port))
-            # Handling responses
-            handle_packets(sock, args)
+    # for tracker in trackers:
+    #     if args.file == tracker.filename:
+    #         sock.sendto(packet, (tracker.hostname, tracker.port))
+    #         # Handling responses
+    #         handle_packets(sock, args)
 
 
 def handle_packets(sock, args):
@@ -113,33 +111,41 @@ def handle_packets(sock, args):
 def main():
     tracker_arr = [] #filename,id,hostname,port sender is recieving requests on 
     with open('tracker.txt', 'r') as file: #you have to request from one sender at a time and then move on to the next
+        content = file.readlines()
+        content = [line.strip() for line in content if line.strip()]  # Avoid empty lines
+        content.sort(key=lambda content: content[1])
+        for i in content:
+            filename, seq_no, hostname, port = i.split()
+            tracker_arr.append(Tracker(filename, int(seq_no), hostname, int(port)))
+
         
+        print('----------------------------')
+        print("Requester’s print information:")
+
+        parser = argparse.ArgumentParser(description="UDP File Requester")
+        parser.add_argument("-p", "--port", type=int, required=True, help="Port to bind to")
+        parser.add_argument("-o", "--file", type=str, required=True, help="File to request")
+        parser.add_argument("-f", "--hostname", type=str, required=True, help="The host name of the emulator.")
+        parser.add_argument("-e", "--e_port", type=int, required=True, help="The port of the emulator.")
+        parser.add_argument("-w", "--window", type=str, required=True, help="The requester's window size.")
+        args = parser.parse_args()
+
+
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            content = file.readlines()
-            content = [line.strip() for line in content if line.strip()]  # Avoid empty lines
-            content.sort(key=lambda content: content[1])
-            for i in content:
-                filename, seq_no, hostname, port = i.split()
-                tracker_arr.append(Tracker(filename, int(seq_no), hostname, int(port)))
-
-            
-            print('----------------------------')
-            print("Requester’s print information:")
-
-
-            parser = argparse.ArgumentParser(description="UDP File Requester")
-            parser.add_argument("-p", "--port", type=int, required=True, help="Port to bind to")
-            parser.add_argument("-o", "--file", type=str, required=True, help="File to request")
-            parser.add_argument("-f", "--hostname", type=int, required=True, help="The host name of the emulator.")
-            parser.add_argument("-e", "--e_port", type=str, required=True, help="The port of the emulator.")
-            parser.add_argument("-w", "--window", type=str, required=True, help="The requester's window size.")
-            args = parser.parse_args()
-
             s.bind((socket.gethostname(), args.port))
+            print("test")
 
+            # requester will advertise a window size to the sender
+            # it is willing to accept 10 packets at once before sending an ACK
+            send_requests(tracker_arr, s, args)
+            # Send the request packet to the emulator
+          
+           # s.sendto(packet, (host, port))
+
+            # send window to the sender
 
             # Send requests in the main thread
-            send_requests(tracker_arr, s, args)
+          #  send_requests(tracker_arr, s, args)
 
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ def send_to_emulator(s, final_packet, dest_host, dest_port):
     pass
 
 def get_packet(s, filename, dest_addr, rate, seq_no, length, priority):
-    
+
 # UPDATE SENDER SO IT CAN:
 # 1. Always start at sequence number 1
 # 2. Increment the sequence number by 1 for each packet sent, instead of by the packet length
@@ -37,6 +37,7 @@ def get_packet(s, filename, dest_addr, rate, seq_no, length, priority):
                 # Sending the END packet
                 header = struct.pack('!cII', b'E', socket.htonl(seq_no), 0)
                 final_size = total_length + len(header)
+                print(final_size)
                 # s.sendto(header, dest_addr) wait
                 current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
                 print(f"send time:\t{current_time}\nrequester addr:\t{address}\nSequence num::\t{seq_no}\nlength:\t\t0\npayload:\t\n")
@@ -44,7 +45,7 @@ def get_packet(s, filename, dest_addr, rate, seq_no, length, priority):
             
             header = struct.pack('!cII', b'D', socket.htonl(seq_no), len(data))
             packet = header + data
-            total_length = len(packet)
+            total_length += len(packet)
 
           #  s.sendto(packet, dest_addr) # wait to send... i think
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
@@ -56,9 +57,16 @@ def get_packet(s, filename, dest_addr, rate, seq_no, length, priority):
             seq_no += 1
             time.sleep(1.0/rate)
 
-    length = len(final_size)
+    # below code creates the packet
+    length = final_size
     src_addr, src_port = s.getsockname()
-    packed_data = struct.pack('!BIHIIHI', priority, src_addr, src_port, dest_addr[0], dest_addr[1], length)
+
+    packed_ip_src = socket.inet_aton(src_addr)
+    packed_ip_dest = socket.inet_aton(dest_addr[0])
+    unpacked_ip_src = struct.unpack('!I', packed_ip_src)[0]
+    unpacked_ip_dest = struct.unpack('!I', packed_ip_dest)[0]
+
+    packed_data = struct.pack('!BIHIHI', priority, unpacked_ip_src, src_port, unpacked_ip_dest, dest_addr[1], int(length))
     final_packet = packed_data + header + data
     print(final_packet)
     return final_packet
@@ -73,13 +81,13 @@ if __name__ == '__main__':
     parser.add_argument('-r', type=int, required=True, help='Rate of sending packets.')
     parser.add_argument('-q', type=int, required=True, help='Initial sequence number.')
     parser.add_argument('-l', type=int, required=True, help='Length of the payload in bytes.')
-    parser.add_argument('-f', type=int, required=True, help='The host name of the emulator.')
+    parser.add_argument('-f', type=str, required=True, help='The host name of the emulator.')
     parser.add_argument('-e', type=int, required=True, help='The port of the emulator.')
     parser.add_argument('-i', type=int, required=True, help='The priority of the sent packets.')
     parser.add_argument('-t', type=int, required=True, help='The timeout for retransmission for lost packets in the unit of milliseconds.')
     args = parser.parse_args()
 
-    args[3] = 1
+    #args[3] = 1
 
     # Check port range validity
     if not (2049 < args.p < 65536) or not (2049 < args.g < 65536):
@@ -101,6 +109,7 @@ if __name__ == '__main__':
                 
                 # Listen for incoming request packets
                 data, addr = s.recvfrom(4096)
+                print(data)
                 packet_type, _, _ = struct.unpack('!cII', data[:9])
                 if packet_type == b'R':
 
@@ -109,10 +118,10 @@ if __name__ == '__main__':
 
                     final_packet = get_packet(s, requested_file, (addr[0], args.g), args.r, args.q, args.l, args.i)
                     send_to_emulator(s, final_packet, args.f, args.e)
-                    # determine if a retransmission occur
-                    if (1 == 2):
-                        retransmissions += 1
-                    transmissions += 1
+                #     # determine if a retransmission occur
+                #     if (1 == 2):
+                #         retransmissions += 1
+                #     transmissions += 1
 
         except KeyboardInterrupt:
             print("\nShutting down sender...")
