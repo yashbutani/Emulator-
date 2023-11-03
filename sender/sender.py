@@ -20,8 +20,8 @@ def get_packet(s, filename, dest_addr, rate, seq_no, length, priority):
 # where total number of transmissions including both normal transmissions and retransmissions.
 # 3. The end packet is sent after ensuring that all data packets have been received by the receiver 
 # (or if max number of retries have reached for sending all packets in the last window).
-    
     address = f"{dest_addr[0]}:{dest_addr[1]}"
+    seq_no = 1
 
     if not os.path.exists(filename):
         print(f"File {filename} not found!")
@@ -37,7 +37,6 @@ def get_packet(s, filename, dest_addr, rate, seq_no, length, priority):
                 # Sending the END packet
                 header = struct.pack('!cII', b'E', socket.htonl(seq_no), 0)
                 final_size = total_length + len(header)
-                print(final_size)
                 # s.sendto(header, dest_addr) wait
                 current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
                 print(f"send time:\t{current_time}\nrequester addr:\t{address}\nSequence num::\t{seq_no}\nlength:\t\t0\npayload:\t\n")
@@ -47,7 +46,7 @@ def get_packet(s, filename, dest_addr, rate, seq_no, length, priority):
             packet = header + data
             total_length += len(packet)
 
-          #  s.sendto(packet, dest_addr) # wait to send... i think
+          #  s.sendto(packet, dest_addr) # wait to send... i think -> send to emulator which determines order
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
             # Print the sender's log
@@ -57,16 +56,26 @@ def get_packet(s, filename, dest_addr, rate, seq_no, length, priority):
             seq_no += 1
             time.sleep(1.0/rate)
 
-    # below code creates the packet
+    # below code creates the new packet with old appened
     length = final_size
     src_addr, src_port = s.getsockname()
 
+    # Convert IP addresses to network byte order
     packed_ip_src = socket.inet_aton(src_addr)
     packed_ip_dest = socket.inet_aton(dest_addr[0])
-    unpacked_ip_src = struct.unpack('!I', packed_ip_src)[0]
-    unpacked_ip_dest = struct.unpack('!I', packed_ip_dest)[0]
 
-    packed_data = struct.pack('!BIHIHI', priority, unpacked_ip_src, src_port, unpacked_ip_dest, dest_addr[1], int(length))
+    # Pack 16-bit ints
+    src_port = socket.htons(src_port)
+    dest_port = socket.htons(dest_addr[1])
+
+    # Pack 32-bit integers
+    packet_len = socket.htonl(length)
+
+    packed_data = struct.pack('!B4sH4sHI', priority, packed_ip_src, src_port, packed_ip_dest, dest_port, packet_len)
+
+
+   # unpacked_ip_src = struct.unpack('!I', packed_ip_src)[0]
+   # unpacked_ip_dest = struct.unpack('!I', packed_ip_dest)[0]
     final_packet = packed_data + header + data
     print(final_packet)
     return final_packet
@@ -87,7 +96,6 @@ if __name__ == '__main__':
     parser.add_argument('-t', type=int, required=True, help='The timeout for retransmission for lost packets in the unit of milliseconds.')
     args = parser.parse_args()
 
-    #args[3] = 1
 
     # Check port range validity
     if not (2049 < args.p < 65536) or not (2049 < args.g < 65536):
@@ -105,21 +113,21 @@ if __name__ == '__main__':
            # The sender keeps this set of data in a buffer, and keeps a timeout for each of the packets. 
            # If it does not receive an ack for a packet and its timeout expires, it will retransmit that packet. 
            # The timeout is fixed and is specified by one of the sender's parameters.
+
             while True:
-                
                 # Listen for incoming request packets
                 data, addr = s.recvfrom(4096)
                 print(data)
                 packet_type, _, _ = struct.unpack('!cII', data[:9])
                 if packet_type == b'R':
-
                     requested_file = data[9:].decode()
                     print('file',requested_file)
 
                     final_packet = get_packet(s, requested_file, (addr[0], args.g), args.r, args.q, args.l, args.i)
                     send_to_emulator(s, final_packet, args.f, args.e)
+
                 #     # determine if a retransmission occur
-                #     if (1 == 2):
+                #     if (if no ack in timeout):
                 #         retransmissions += 1
                 #     transmissions += 1
 

@@ -23,12 +23,39 @@ def write_to_file(file_name, payload):
         file.write(payload.decode())
 
 
-def send_requests(trackers, sock, args):
+def send_requests(trackers, s, args):
     packet_type = b'R'
     seq_num = socket.htonl(0)
-    length = socket.htonl(0)
-    packet = struct.pack("!cII", packet_type, seq_num, length) + args.file.encode()
-    sock.sendto(packet, (args.hostname, args.e_port))
+    length = socket.htonl(args.window)
+    old_packet = struct.pack("!cII", packet_type, seq_num, length) + args.file.encode()
+
+    src_addr, src_port = s.getsockname()
+
+    # setup new packet (priority always 1 w requester)
+    priority = 0x01
+
+    # Convert IP addresses to network byte order
+    packed_ip_src = socket.inet_aton(src_addr)
+
+    # 16-bit
+    src_port = socket.htons(src_port)
+    
+    # get destination from trackers
+    for tracker in trackers:            # TODO important -> what will happen if there are multiple trakers!!!
+        ip_addr = socket.gethostbyname(tracker.hostname)
+        packed_ip_dest = socket.inet_aton(ip_addr)
+        dest_port = socket.htons(tracker.port)
+    
+    # len of new packet == length of old
+    packet_len = len(old_packet)
+
+    # create new packet
+    packed_data = struct.pack('!B4sH4sHI', priority, packed_ip_src, src_port, packed_ip_dest, dest_port, packet_len)
+
+    # combine w previous
+    final_packet = packed_data + old_packet
+
+    s.sendto(final_packet, (args.hostname, args.e_port))
 
     # for tracker in trackers:
     #     if args.file == tracker.filename:
@@ -127,7 +154,7 @@ def main():
         parser.add_argument("-o", "--file", type=str, required=True, help="File to request")
         parser.add_argument("-f", "--hostname", type=str, required=True, help="The host name of the emulator.")
         parser.add_argument("-e", "--e_port", type=int, required=True, help="The port of the emulator.")
-        parser.add_argument("-w", "--window", type=str, required=True, help="The requester's window size.")
+        parser.add_argument("-w", "--window", type=int, required=True, help="The requester's window size.")
         args = parser.parse_args()
 
 
@@ -138,6 +165,8 @@ def main():
             # requester will advertise a window size to the sender
             # it is willing to accept 10 packets at once before sending an ACK
             send_requests(tracker_arr, s, args)
+
+
             # Send the request packet to the emulator
           
            # s.sendto(packet, (host, port))
