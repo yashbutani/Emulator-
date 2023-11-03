@@ -43,7 +43,7 @@ def send_file(s, filename, dest_addr, rate, seq_no, length):
             print("\nDATA Packet")
             print(f"send time:\t{current_time}\nrequester addr:\t{address}\nSequence num::\t{seq_no}\nlength:\t\t{len(data)}\npayload:\t{data[:4].decode('utf-8', 'ignore')}")
             
-            seq_no += len(data)
+            seq_no += 1
             time.sleep(1.0/rate)
 
 if __name__ == '__main__':
@@ -58,6 +58,8 @@ if __name__ == '__main__':
     parser.add_argument('-i', type=int, required=True, help='The priority of the sent packets.')
     parser.add_argument('-t', type=int, required=True, help='The timeout for retransmission for lost packets in the unit of milliseconds.')
     args = parser.parse_args()
+
+    args[3] = 1
 
     # Check port range validity
     if not (2049 < args.p < 65536) or not (2049 < args.g < 65536):
