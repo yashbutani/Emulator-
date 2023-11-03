@@ -6,6 +6,16 @@ import os
 from datetime import datetime
 
 def send_file(s, filename, dest_addr, rate, seq_no, length):
+# UPDATE SENDER SO IT CAN:
+# 1. Always start at sequence number 1
+# 2. Increment the sequence number by 1 for each packet sent, instead of by the packet length
+# 3. Print out the observed percentage of packets lost. # The loss rate that the sender prints
+# out is not necessarily the same as the loss rate that we identify in the forwarding table since the sender might miss some ACKs. 
+# This loss rate is computed by (number of retransmissions / total number of transmissions), 
+# where total number of transmissions including both normal transmissions and retransmissions.
+# 3. The end packet is sent after ensuring that all data packets have been received by the receiver 
+# (or if max number of retries have reached for sending all packets in the last window).
+ 
     address = f"{dest_addr[0]}:{dest_addr[1]}"
 
     if not os.path.exists(filename):
@@ -43,6 +53,10 @@ if __name__ == '__main__':
     parser.add_argument('-r', type=int, required=True, help='Rate of sending packets.')
     parser.add_argument('-q', type=int, required=True, help='Initial sequence number.')
     parser.add_argument('-l', type=int, required=True, help='Length of the payload in bytes.')
+    parser.add_argument('-f', type=int, required=True, help='The host name of the emulator.')
+    parser.add_argument('-e', type=int, required=True, help='The port of the emulator.')
+    parser.add_argument('-i', type=int, required=True, help='The priority of the sent packets.')
+    parser.add_argument('-t', type=int, required=True, help='The timeout for retransmission for lost packets in the unit of milliseconds.')
     args = parser.parse_args()
 
     # Check port range validity
