@@ -38,11 +38,10 @@ def send_file(s, filename, dest_addr, rate, seq_no, length):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-p', type=int, required=True, help='Port for the sender to listen on.')
-    parser.add_argument('-g', type=int, required=True, help='Port for the requester.')
-    parser.add_argument('-r', type=int, required=True, help='Rate of sending packets.')
-    parser.add_argument('-q', type=int, required=True, help='Initial sequence number.')
-    parser.add_argument('-l', type=int, required=True, help='Length of the payload in bytes.')
+    parser.add_argument('-p', type=int, required=True, help='Port of the emulator.')
+    parser.add_argument('-q', type=int, required=True, help='The size of each of the three queues.')
+    parser.add_argument('-f', type=int, required=True, help='The name of the file containing the static forwarding table.')
+    parser.add_argument('-l', type=int, required=True, help='The name of the log file.')
     args = parser.parse_args()
 
     # Check port range validity
@@ -53,7 +52,7 @@ if __name__ == '__main__':
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         s.bind((socket.gethostname(), args.p))
         print('----------------------------')
-        print("sender1's print information:")
+        print("emualtor's print information:")
 
         try:
             while True:
