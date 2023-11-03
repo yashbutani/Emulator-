@@ -7,11 +7,15 @@ from datetime import datetime
 
 
 class Tracker:
-    def __init__(self, filename, seq_no, hostname, port):
+    def __init__(self, priority, src_ip, source_port, dest_ip, dest_port, length, filename, seq_no, hostname, port):
         self.filename = filename
         self.seq_no = seq_no
         self.hostname = hostname
         self.port = port
+        self.priority = priority
+        self.src_ip = src_ip
+        self.source_port = source_port
+        
 
 
 def write_to_file(file_name, payload):

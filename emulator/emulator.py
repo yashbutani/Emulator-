@@ -4,6 +4,7 @@ import time
 import struct
 import os
 from datetime import datetime
+from queue import PriorityQueue
 
 def rounting():
     pass
@@ -85,6 +86,10 @@ if __name__ == '__main__':
     parser.add_argument('-f', type=int, required=True, help='The name of the file containing the static forwarding table.')
     parser.add_argument('-l', type=int, required=True, help='The name of the log file.')
     args = parser.parse_args()
+    
+    high = PriorityQueue(maxsize=args[1])
+    medium = PriorityQueue(maxsize=args[1])
+    low = PriorityQueue(maxsize=args[1])
 
     # Check port range validity
     if not (2049 < args.p < 65536) or not (2049 < args.g < 65536):
