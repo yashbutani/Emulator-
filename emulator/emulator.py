@@ -5,9 +5,30 @@ import struct
 import os
 from datetime import datetime
 
-def rounting():
-    pass
-#Routing function:
+def rounting(filename):
+    match = False
+    table = []
+    destination = 1
+    # read 
+    with open(filename, 'r') as file:
+        for line in file:
+            content = line.split()
+            entry_names = []
+            for word in content:
+                entry_names.append(word)
+            table.append(entry_names)
+
+    print(table)
+
+    # compare destination of incoming packet to forwarding table
+    for entry in table:
+        if entry[1] == destination:
+            print("Queue packet for forwarding to the next hop")
+        else:
+            # drop packet and event should be logged
+            logging()
+
+# Routing function:
 # The routing function is based on the static forwarding table that you provide to your program 
 # through the file described above. The destination of an incoming packet is compared with the
 # destination in the forwarding table to find a match. If a match is found, the packet is queued for forwarding to the next hop.
@@ -82,12 +103,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-p', type=int, required=True, help='Port of the emulator.')
     parser.add_argument('-q', type=int, required=True, help='The size of each of the three queues.')
-    parser.add_argument('-f', type=int, required=True, help='The name of the file containing the static forwarding table.')
-    parser.add_argument('-l', type=int, required=True, help='The name of the log file.')
+    parser.add_argument('-f', type=str, required=True, help='The name of the file containing the static forwarding table.')
+    parser.add_argument('-l', type=str, required=True, help='The name of the log file.')
     args = parser.parse_args()
 
     # Check port range validity
-    if not (2049 < args.p < 65536) or not (2049 < args.g < 65536):
+    if not (2049 < args.p < 65536):
         print("Error: Port number must be in the range 2050 to 65535.")
         exit(1)
 
@@ -95,16 +116,20 @@ if __name__ == '__main__':
         s.bind((socket.gethostname(), args.p))
         print('----------------------------')
         print("emualtor's print information:")
+        rounting(args.f)
 
         try:
             while True:
                 # Listen for incoming request packets
                 data, addr = s.recvfrom(4096)
                 packet_type, _, _ = struct.unpack('!cII', data[:9])
+                rounting(args.f)
+
                 if packet_type == b'R':
                     requested_file = data[9:].decode()
                     print('file',requested_file)
-                    send_file(s, requested_file, (addr[0], args.g), args.r, args.q, args.l)
+
+                    #send_file(s, requested_file, (addr[0], args.g), args.r, args.q, args.l)
 
         except KeyboardInterrupt:
             print("\nShutting down sender...")
