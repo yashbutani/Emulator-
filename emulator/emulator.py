@@ -5,6 +5,48 @@ import struct
 import os
 from datetime import datetime
 
+def rounting():
+    pass
+#Routing function:
+# The routing function is based on the static forwarding table that you provide to your program 
+# through the file described above. The destination of an incoming packet is compared with the
+# destination in the forwarding table to find a match. If a match is found, the packet is queued for forwarding to the next hop.
+# If a match is not found, the packet is dropped and the event should be logged (see logging function below).
+
+# The emulator reads this file once it starts running and then only refers to its version of the file in memory 
+# for every packet. The emulator ignores lines in the table that do not correspond to its own hostname and port. 
+# Note that emulator, sender, and requester are all uniquely identified with a "<Host name, Port>" pair and thus 
+# multiple of them can run on the same host.
+
+def queueing():
+    pass
+# Queueing function:
+
+# The queueing function should examine the priority field on the packet and place the packet in an appropriate queue. 
+# All the three queues are of fixed size. This queue size is specified on the command line of the emulator startup. 
+# If a queue is full, the packet is dropped and this event is logged (see logging function below).
+
+def send():
+    pass
+# Send function:
+
+# The send function accepts packets from the three queues defined above and simulates network link conditions for each destination. 
+# Packets bound for a destination are first delayed to simulate link bandwidth. The delay is defined in the forwarding table and is 
+# specified in milliseconds. After a packet has been delayed, it may be dropped to simulate a lossy link based on the loss probability 
+# provided in the forwarding table, and the event is logged (see logging function below). If a packet is not dropped, it is then sent to 
+# the network
+
+def logging():
+    pass
+# Logging function:
+
+# The logging function is integral to all functions of the emulator. A packet may be dropped in the emulator in the routing function,
+# the queueing function, or in the send function. Any and all packet drop events must be logged to a file. Loss events must provide a
+# textual reason for the loss (e.g., "no forwarding entry found", "priority queue 1 was full'', "loss event occurred.") Each log event
+# must include the source hostname and port, the intended destination host name and port, the time of loss (to millisecond resolution),
+# the priority level of the packet, and the size of the payload.
+    
+
 def send_file(s, filename, dest_addr, rate, seq_no, length):
     address = f"{dest_addr[0]}:{dest_addr[1]}"
 
