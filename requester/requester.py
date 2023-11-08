@@ -57,6 +57,8 @@ def send_requests(trackers, s, args):
 
     s.sendto(final_packet, (args.hostname, args.e_port))
 
+    handle_packets(s, args)
+
     # for tracker in trackers:
     #     if args.file == tracker.filename:
     #         sock.sendto(packet, (tracker.hostname, tracker.port))
@@ -69,9 +71,11 @@ def handle_packets(sock, args):
 
 
     while True:
+        print("hello")
         data, addr = sock.recvfrom(65535)  # Maximum UDP packet size
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-        packet_type, seq_num, length = struct.unpack("!cII", data[:9])
+        print(data)
+        packet_type, seq_num, length = struct.unpack("!cII", data[17:26])
 
 
         seq_num = socket.ntohl(seq_num)  # Convert seq_num from network byte order to host byte order
@@ -160,8 +164,7 @@ def main():
 
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.bind((socket.gethostname(), args.port))
-            print("test")
-
+            
             # requester will advertise a window size to the sender
             # it is willing to accept 10 packets at once before sending an ACK
             send_requests(tracker_arr, s, args)

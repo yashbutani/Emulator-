@@ -31,3 +31,7 @@ Emulator:
 - Add to a queue
 - Send the data based on the priority queue
 
+
+
+- Reliable Transfer
+To achieve the reliable transfer, the requester will advertise a window size (see the requester specification of this write up for more info) to the sender with the request packet. The sender will send a full "window" of packets and wait for ACKs of each packet before sending more packets. After a certain timeout, the sender will retransmit the packets that it has not received an ack for.

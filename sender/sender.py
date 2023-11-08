@@ -118,9 +118,10 @@ if __name__ == '__main__':
                 # Listen for incoming request packets
                 data, addr = s.recvfrom(4096)
                 print(data)
-                packet_type, _, _ = struct.unpack('!cII', data[:9])
+                packet_type, _, _ = struct.unpack('!cII', data[17:26])
                 if packet_type == b'R':
-                    requested_file = data[9:].decode()
+                    print("hello world")
+                    requested_file = data[26:].decode()
                     print('file',requested_file)
 
                     final_packet = get_packet(s, requested_file, (addr[0], args.g), args.r, args.q, args.l, args.i)

@@ -40,8 +40,28 @@ class Emulator:
         dest_port = socket.ntohs(unpacked_data[4])
         length = socket.ntohl(unpacked_data[5])
 
-        data = Data(priority, ip_src, ip_dest, src_port, dest_port, length)
+        data = Data(priority, ip_src, src_port, ip_dest, dest_port, length)
         return data
+
+    def pack_data(self,packet, bytes_packet):
+      #  priority, ip_src, src_port, ip_dest, dest_port, length
+        priority = packet.priority
+
+        packed_ip_src = socket.inet_aton(packet.ip_src)
+        packed_ip_dest = socket.inet_aton(packet.ip_dest)
+
+        # 16-bit
+        src_port = socket.htons(packet.src_port)
+        dest_port = socket.htons(packet.dest_port)
+
+        packet_len = packet.length
+
+        packed_data = struct.pack('!B4sH4sHI', priority, packed_ip_src, src_port, packed_ip_dest, dest_port, packet_len)
+
+        final_packet = packed_data + bytes_packet[17:]
+
+        return final_packet
+
 
     def log(self, message, data_packet):
 # Logging function:
@@ -52,13 +72,13 @@ class Emulator:
     # the priority level of the packet, and the size of the payload.
 
         print(message)
-        print(f"Source Host and Port: {data_packet.ip_src}: {data_packet.src_port}")
-        print(f"Destination Host and Port: {data_packet.ip_dest}: {data_packet.dest_port}")
+        print(f"Source Host and Port: {data_packet.ip_src}:{data_packet.src_port}")
+        print(f"Destination Host and Port: {data_packet.ip_dest}:{data_packet.dest_port}")
         # TODO time of loss
         print(f"Priority: {data_packet.priority}")
-        print(f"Payload size: {data_packet.length}")
+        print(f"Payload size: {data_packet.length}\n")
 
-    def route_packet(self, data_packet):
+    def route_packet(self, bytes_packet, data_packet):
 # Routing function:
     # The routing function is based on the static forwarding table that you provide to your program 
     # through the file described above. The destination of an incoming packet is compared with the
@@ -72,14 +92,22 @@ class Emulator:
 
         # compare destination of incoming packet to forwarding table
         destination_ip = data_packet.ip_dest
-        destination_port = data_packet.port_dest
+        destination_port = data_packet.dest_port
 
         src_addr, src_port = self.socket.getsockname() 
         for entry in self.forwarding_table:
-            if entry[0] != src_addr and entry[1] != src_port: # ignore packets that don't corresponse to its own hostname and porpt
+            ip_src = socket.gethostbyname(entry[0])
+            port_src = entry[1]
+            ip_dest = socket.gethostbyname(entry[2])
+            port_dest = int(entry[3])
+
+            if ip_src != src_addr and port_src != src_port: # ignore packets that don't corresponse to its own hostname and porpt
                 continue
-            if entry[2] == destination_ip and entry[3] == destination_port: # indicates a match
-                self.queueing()
+
+            if ip_dest == destination_ip and port_dest == destination_port: # indicates a match
+                packet = self.pack_data(data_packet, bytes_packet)
+                destination = [ip_dest, port_dest]
+                self.queueing(data_packet.priority, packet, destination)
                 print("Queue packet for forwarding to the next hop")
             else:
                 # drop packet and event should be logged
@@ -96,41 +124,11 @@ class Emulator:
 
         # TODO get sender info from forwarding table -> not hardcoded
         #data, addr = self.socket.recvfrom(4096)
-        
-        if destination == 1: # means it was a request packet so need to call sender from the emulator
-            packet_type, seq_no, window = struct.unpack('!cII', packet[:9])
-            seq_no = socket.ntohl(seq_no)
-            window = socket.ntohl(window)
-            print('Window:', window)
-            requested_file = packet[9:].decode()
-            print('File:',requested_file, '\n')
-
-            self.socket.sendto(packet, ('Jacks-MacBook-Air.local', 5000))
-        else:
-            unpacked_data = struct.unpack('!B4sH4sHI', packet[:17])
-            priority = unpacked_data[0]
-
-            # IP conversion
-            ip_src = socket.inet_ntoa(unpacked_data[1])
-            ip_dest = socket.inet_ntoa(unpacked_data[3])
-
-            # int conversions
-            src_port = socket.ntohs(unpacked_data[2])
-            dest_port = socket.ntohs(unpacked_data[4])
-            length = socket.ntohl(unpacked_data[5])
-
-            print("Priority:", priority)
-            print("Source IP:", ip_src)
-            print("Source Port:", src_port)
-            print("Destination IP:", ip_dest)
-            print("Destination Port:", dest_port)
-            print("Length:", length)
+        self.socket.sendto(packet, (destination[0], destination[1]))
 
 
-        # Simulate network conditions and send packet
-        # ...
-
-    def queueing():
+    def queueing(self, priority, packet, destination):
+        self.queue[priority-1].append([packet, destination])
 # Queueing function:
 
     # The queueing function should examine the priority field on the packet and place the packet in an appropriate queue. 
@@ -144,20 +142,9 @@ class Emulator:
         while True:
             destination = 0
             try:
-                packet, addr = self.socket.recvfrom(1024)
-                data_packet = self.unpack_data(packet) # convert packet
-                self.route_packet(data_packet)
-
-
-                #self.route_packet(packet)
-
-
-                # packet_type, seq_no, window = struct.unpack('!cII', packet[:9])
-                # if packet_type == b'R':
-                #     destination = 1
-                # print(packet)
-                # self.send_packet(packet, destination) # TODO will be moved in the for loop on the bottom; testing right now
-                # self.route_packet(packet) # TODO will either route a sender or receiver
+                bytes_packet, addr = self.socket.recvfrom(1024)
+                data_packet = self.unpack_data(bytes_packet) # convert packet
+                self.route_packet(bytes_packet, data_packet)
             except socket.error:
                 # check if a packet is being delayed, if the delay hasn't expired go back to listening
 
@@ -172,9 +159,8 @@ class Emulator:
 
             for priority_queue in self.queue:
                 if priority_queue:
-                    print("test")
-                    packet = priority_queue.pop(0)
-                    # ... send_packet() ...
+                    packet, destination = priority_queue.pop(0)
+                    self.send_packet(packet, destination)
                     time.sleep(0.01)
 
 if __name__ == '__main__':
