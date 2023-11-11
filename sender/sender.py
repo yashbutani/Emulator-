@@ -73,7 +73,9 @@ def main():
     parser.add_argument('-e', type=int, required=True, help='The port of the emulator.')
     parser.add_argument('-i', type=int, required=True, help='The priority of the sent packets.')
     parser.add_argument('-t', type=float, required=True, help='Timeout in seconds for ACKs.')
+    parser.add_argument('-q', type=float, required=True, help='Sequence Number')
     args = parser.parse_args()
+    args.q = 1 
 
     if not (2049 < args.p < 65536):
         print("Error: Port number must be in the range 2050 to 65535.")

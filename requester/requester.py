@@ -56,6 +56,7 @@ def main():
     parser.add_argument("-o", "--file", type=str, required=True, help="File to request")
     parser.add_argument("-f", "--hostname", type=str, required=True, help="The hostname of the emulator")
     parser.add_argument("-e", "--e_port", type=int, required=True, help="The port of the emulator")
+    parser.add_argument("-w", "--window", type=int, required=True, help="The window size")
     args = parser.parse_args()
 
     emulator_addr = (args.hostname, args.e_port)  # Address of the emulator for sending ACKs
