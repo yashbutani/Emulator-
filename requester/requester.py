@@ -2,6 +2,13 @@ import argparse
 import socket
 import struct
 from datetime import datetime
+class Tracker:
+    def __init__(self, filename, seq_no, hostname, port):
+        self.filename = filename
+        self.seq_no = seq_no
+        self.hostname = hostname
+        self.port = port
+
 
 def write_to_file(file_name, data):
     """ Append data to the file. """
@@ -12,6 +19,13 @@ def send_ack(sock, seq_num, emulator_addr):
     """ Send an ACK packet for the given sequence number to the emulator address. """
     ack_packet = struct.pack("!cI", b'A', socket.htonl(seq_num))  # Pack the ACK packet with the sequence number
     sock.sendto(ack_packet, emulator_addr)
+
+def write_to_file(file_name, payload):
+    with open(file_name, 'a') as file:
+        # if payload == "end":
+        #     file.write("\n")
+      #  else:
+        file.write(payload.decode())
 
 def handle_packets(sock, file_name, emulator_addr):
     expected_seq_num = 1  # The expected sequence number of the next packet
@@ -50,7 +64,88 @@ def handle_packets(sock, file_name, emulator_addr):
               f"Packet sequence number: {seq_num}, Payload's length: {length}, "
               f"First 4 bytes of the payload: {packet[9:13].decode('utf-8', 'ignore')}")
 
+def send_requests(trackers, s, args):
+    # setup new packet (priority always 1 w requester)
+    priority = 0x01
+    packet_type = b'R'
+    seq_num = socket.htonl(0)
+    length = socket.htonl(args.window)
+    
+    src_addr, src_port = s.getsockname()
+    packed_ip_src = socket.inet_aton(src_addr)
+    src_port = socket.htons(src_port)
+
+    # Send a request to each tracker for the requested file
+    for tracker in trackers:
+        if args.file == tracker.filename:
+            # Prepare the request packet
+            request_packet = struct.pack("!cII", packet_type, seq_num, length) + args.file.encode()
+
+            # Get the destination address and port from the tracker info
+            dest_addr = socket.gethostbyname(tracker.hostname)
+            dest_port = tracker.port
+
+            # Convert destination address and port to network byte order
+            packed_ip_dest = socket.inet_aton(dest_addr)
+            dest_port = socket.htons(dest_port)
+
+            # Create the final packet with both old and new headers
+            packet_len = len(request_packet)
+            packed_data = struct.pack('!B4sH4sHI', priority, packed_ip_src, src_port, packed_ip_dest, dest_port, packet_len)
+            final_packet = packed_data + request_packet
+
+            # Send the final packet to the emulator's address and port
+            emulator_addr = (args.hostname, args.e_port)
+            s.sendto(final_packet, emulator_addr)
+
+            # Handle incoming packets after sending the request
+            handle_packets(s, args.file, emulator_addr)
+            break  # Assuming we stop after handling the first matching tracker
+
+    # packet_type = b'R'
+    # seq_num = socket.htonl(0)
+    # length = socket.htonl(args.window)
+    # old_packet = struct.pack("!cII", packet_type, seq_num, length) + args.file.encode()
+
+    # src_addr, src_port = s.getsockname()
+
+    # # setup new packet (priority always 1 w requester)
+    # priority = 0x01
+
+    # # Convert IP addresses to network byte order
+    # packed_ip_src = socket.inet_aton(src_addr)
+
+    # # 16-bit
+    # src_port = socket.htons(src_port)
+    
+    # # get destination from trackers
+    # for tracker in trackers:            # TODO important -> what will happen if there are multiple trakers!!!
+    #     ip_addr = socket.gethostbyname(tracker.hostname)
+    #     packed_ip_dest = socket.inet_aton(ip_addr)
+    #     dest_port = socket.htons(tracker.port)
+    
+    # # len of new packet == length of old
+    # packet_len = len(old_packet)
+
+    # # create new packet
+    # packed_data = struct.pack('!B4sH4sHI', priority, packed_ip_src, src_port, packed_ip_dest, dest_port, packet_len)
+
+    # # combine w previous
+    # final_packet = packed_data + old_packet
+
+    # s.sendto(final_packet, (args.hostname, args.e_port))
+
+    # handle_packets(s, args, (args.hostname, args.e_port))
+
+    # # for tracker in trackers:
+    # #     if args.file == tracker.filename:
+    # #         sock.sendto(packet, (tracker.hostname, tracker.port))
+    # #         # Handling responses
+    # #         handle_packets(sock, args)
+
+
 def main():
+    tracker_arr = []
     parser = argparse.ArgumentParser(description="UDP File Requester")
     parser.add_argument("-p", "--port", type=int, required=True, help="Port to bind to")
     parser.add_argument("-o", "--file", type=str, required=True, help="File to request")
@@ -61,10 +156,18 @@ def main():
 
     emulator_addr = (args.hostname, args.e_port)  # Address of the emulator for sending ACKs
 
+    with open('tracker.txt', 'r') as file: #you have to request from one sender at a time and then move on to the next
+        content = file.readlines()
+        content = [line.strip() for line in content if line.strip()]  # Avoid empty lines
+        content.sort(key=lambda content: content[1])
+        for i in content:
+            filename, seq_no, hostname, port = i.split()
+            tracker_arr.append(Tracker(filename, int(seq_no), hostname, int(port)))
+
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         s.bind(('', args.port))  # Bind to the requester's port
         print(f"Requester bound to {socket.gethostname()} on port {args.port}")
-
+        send_requests(tracker_arr, s, args)
         # Handle incoming packets and send ACKs
         handle_packets(s, args.file, emulator_addr)
 
