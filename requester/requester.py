@@ -65,6 +65,7 @@ def handle_packets(sock, file_name, emulator_addr):
               f"First 4 bytes of the payload: {packet[9:13].decode('utf-8', 'ignore')}")
 
 def send_requests(trackers, s, args):
+    print('inside send requests')
     # setup new packet (priority always 1 w requester)
     priority = 0x01
     packet_type = b'R'
@@ -77,7 +78,9 @@ def send_requests(trackers, s, args):
 
     # Send a request to each tracker for the requested file
     for tracker in trackers:
+        print('inside loop')
         if args.file == tracker.filename:
+            print('inside if statement')
             # Prepare the request packet
             request_packet = struct.pack("!cII", packet_type, seq_num, length) + args.file.encode()
 
@@ -167,6 +170,7 @@ def main():
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         s.bind(('', args.port))  # Bind to the requester's port
         print(f"Requester bound to {socket.gethostname()} on port {args.port}")
+        print('entering send requests')
         send_requests(tracker_arr, s, args)
         # Handle incoming packets and send ACKs
         handle_packets(s, args.file, emulator_addr)

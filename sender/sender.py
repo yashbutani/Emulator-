@@ -88,9 +88,13 @@ def main():
 
         while True:
             print("Waiting for incoming requests...")
-            data, addr = sock.recvfrom(1024)
+            data, addr = sock.recvfrom(4096)
+            print('data',data)
+            print('after data')
             packet_type, _, _ = struct.unpack('!cII', data[:9])
+            print('inside sender loop')
             if packet_type == b'R':
+                print('inside if')
                 requested_file = data[9:].decode()
                 dest_addr = (args.f, args.e)
                 send_data(sock, requested_file, dest_addr, args.r, args.l, args.i, args.t)

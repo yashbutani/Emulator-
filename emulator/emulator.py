@@ -40,7 +40,7 @@ class Emulator:
         return priority, socket.inet_ntoa(ip_src), socket.ntohs(src_port), socket.inet_ntoa(ip_dest), socket.ntohs(dest_port), length, data
 
     def queue_packet(self, packet):
-        if len(self.queues[packet.priority]) < self.queue_sizes[packet.priority - 1]:
+        if len(self.queues[packet.priority]) < args.q:
             self.queues[packet.priority].append(packet)
             self.log(f"Packet queued", packet)
         else:
