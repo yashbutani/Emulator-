@@ -139,19 +139,30 @@ if __name__ == '__main__':
                     window = socket.ntohl(window) 
                     seq_no = socket.ntohl(seq_no)
                     bps = file_packet_size + 17 
-                    packets_per_window = bps/window
+                    packets_per_window = bps//window
                     print('window',window)
                     print('file',requested_file)
-                    print('file_packet_size',packets_per_window)
+                    print('file_packet_size',type(packets_per_window))
                   #  exit(1)
-                    packet_buffer = {}
-                    final_packet,curent_seq_no = get_packet(s, requested_file, (addr[0], args.g), args.r, args.q, args.l, args.i, file_packet_size)
-                    while not receive_ack(s,curent_seq_no,args.t):
-                        retransmissions +=1
-                        send_to_emulator(s, final_packet, args.f, args.e)
-                        if retransmissions > 5: 
-                            print(f"Gave up on packet with sequence number {curent_seq_no}")
-                            break
+                    packet_buffer = {} #mapping of seq_no -> ack {seq_no : ACK }
+                    packet_seq = {} #mapping of sequence num to packet {seq_no : final packet }
+                    for i in range(packets_per_window): 
+                        final_packet,current_seq_no = get_packet(s, requested_file, (addr[0], args.g), args.r, args.q, args.l, args.i, file_packet_size)
+                        packet_buffer[current_seq_no] = False 
+                        packet_seq[current_seq_no] = final_packet
+                    while packet_buffer: # loop until all packets have been acked 
+                        for seq_no in packet_buffer: 
+                            if receive_ack(s,seq_no,args.t):
+                                print('ACK Recieved')
+                                del packet_buffer[seq_no]
+                            else: 
+                                while not receive_ack(s,seq_no,args.t):#while the ack is not recieved for the seq no
+                                    print("ACK Not Recieved")
+                                    retransmissions +=1
+                                    send_to_emulator(s, final_packet, args.f, args.e)
+                                    if retransmissions > 5: 
+                                        print(f"Gave up on packet with sequence number {current_seq_no}")
+                                        continue
                     #send_to_emulator(s, final_packet, args.f, args.e)
 
                 #     # determine if a retransmission occur
