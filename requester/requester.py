@@ -109,9 +109,15 @@ def handle_packets(sock, args):
             sender_stats[key]["total_packets"] += 1
             sender_stats[key]["total_bytes"] += len(payload)
 
+            # build an ack packet of priority 1
+            ack_packet = struct.pack("!c", b'A')
+
+
+
            #if data_end != True:
             # Here you would handle the data, e.g., writing it to a file
             write_to_file(args.file, payload)
+
 
 
         elif packet_type == b'E':
@@ -164,7 +170,7 @@ def main():
 
 
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.bind((socket.gethostname(), args.port))
+            s.bind(('localhost', args.port))
             
             # requester will advertise a window size to the sender
             # it is willing to accept 10 packets at once before sending an ACK

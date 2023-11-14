@@ -9,10 +9,10 @@ execute:
 the first print statement will have your localhost. Change Jacks-MacBook-Air.local in **tracker.txt** to your localhost
 
 2. Start sender: -> make sure to change to your localhost found previously
-```python3 sender.py -p 5000 -g 4000 -r 100 -q 1 -l 10 -f Jacks-MacBook-Air.local -e 3000 -i 3 -t 1000```
+```python3 sender.py -p 5000 -g 4000 -r 100 -q 1 -l 10 -f localhost -e 3000 -i 3 -t 1000```
 
 3. Run requester -> make sure to change to your localhost found previously
-```python3 requester.py -p 4000 -f Jacks-MacBook-Air.local -e 3000 -o file.txt -w 10```
+```python3 requester.py -p 4000 -f localhost -e 3000 -o file.txt -w 10```
 
 ## You will see
 Sender:
@@ -35,3 +35,5 @@ Emulator:
 
 - Reliable Transfer
 To achieve the reliable transfer, the requester will advertise a window size (see the requester specification of this write up for more info) to the sender with the request packet. The sender will send a full "window" of packets and wait for ACKs of each packet before sending more packets. After a certain timeout, the sender will retransmit the packets that it has not received an ack for.
+
+- change from localhost back to socket.gethostname() in binding for sender, requester, and emulator

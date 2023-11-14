@@ -26,7 +26,8 @@ class Packet:
 class Emulator:
     def __init__(self, port, queue_sizes, forwarding_table, log_file):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.socket.bind((socket.gethostname(), port))
+        print(socket.gethostname())
+        self.socket.bind(('localhost', port))
         self.queues = {1: [], 2: [], 3: []}  # Separate queue for each priority
         self.queue_sizes: int = queue_sizes  # Dict with queue sizes for each priority
         self.forwarding_table = forwarding_table
