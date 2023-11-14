@@ -105,6 +105,7 @@ def send_packets(s, filename, sender_info):
 
             # combime both packet headers and payload data
             packet = emulator_header + sender_header + data
+            
             #total_length += len(packet)
 
             # emulator header completed now add data from the file and construct the packet_buffer
@@ -119,7 +120,7 @@ def send_packets(s, filename, sender_info):
                     time.sleep(0.01)  # Wait for 0.01 seconds before sending the next packet
                     send_to_emulator(s, packet, sender_info.em_host, sender_info.em_port)
 
-                    
+
 
                 # Check for ACKs
                 readable, writable, exceptional = s.select([s], [], [], sender_info.timeout)
@@ -223,6 +224,8 @@ if __name__ == '__main__':
                 if packet_type == b'R':
                     requested_file = data[26:].decode()
                     send_packets(s, requested_file, sender_info)
+                if packet_type == b'A':
+                    pass
 
 
                     # window = socket.ntohl(window) 
