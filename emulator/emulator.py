@@ -40,7 +40,8 @@ class Emulator:
         return priority, socket.inet_ntoa(ip_src), socket.ntohs(src_port), socket.inet_ntoa(ip_dest), socket.ntohs(dest_port), length, data
 
     def queue_packet(self, packet):
-        if len(self.queues[packet.priority]) < args.q:
+        print(type(len(self.queues[packet.priority])))
+        if len(self.queues[packet.priority]) < self.queue_sizes:
             self.queues[packet.priority].append(packet)
             self.log(f"Packet queued", packet)
         else:
@@ -79,8 +80,8 @@ class Emulator:
                 self.queue_packet(packet)
             except socket.error:
                 pass  # Non-blocking call, proceed if no packet is received
-
-            self.forward_packets()
+            finally:         
+                self.forward_packets()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -102,8 +103,8 @@ if __name__ == '__main__':
                 forwarding_table[(dest_ip, int(dest_port))] = ((next_hop_ip, int(next_hop_port)), int(delay), float(loss_prob))
 
     # Set the queue sizes for each priority
-    queue_sizes = {1: args.q, 2: args.q, 3: args.q}
+    #queue_sizes = {1: args.q, 2: args.q, 3: args.q}
     
     # Initialize the emulator with the loaded forwarding table and log file
-    emulator = Emulator(args.p, queue_sizes, forwarding_table, args.l)
+    emulator = Emulator(args.p, args.q, forwarding_table, args.l)
     emulator.run()
