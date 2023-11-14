@@ -4,6 +4,7 @@ import time
 import struct
 import os
 from datetime import datetime
+import math 
 
 def send_to_emulator(s, final_packet, dest_host, dest_port):
     s.sendto(final_packet, (dest_host, dest_port))
@@ -20,7 +21,7 @@ def receive_ack(sock, expected_seq_no, timeout):
     except socket.timeout:
         return False  # ACK not received within the timeout
 
-def get_packet(s, filename, dest_addr, rate, seq_no, length, priority):
+def get_packet(s, filename, dest_addr, rate, seq_no, length, priority, file_packet_size):
 # UPDATE SENDER SO IT CAN:
 # 3. Print out the observed percentage of packets lost. # The loss rate that the sender prints
 # out is not necessarily the same as the loss rate that we identify in the forwarding table since the sender might miss some ACKs. 
@@ -30,6 +31,24 @@ def get_packet(s, filename, dest_addr, rate, seq_no, length, priority):
 # (or if max number of retries have reached for sending all packets in the last window).
     address = f"{dest_addr[0]}:{dest_addr[1]}"
     seq_no = 1
+    
+    # creating header
+     # below code creates the new packet with old appened
+    length = file_packet_size
+    src_addr, src_port = s.getsockname()
+
+    # Convert IP addresses to network byte order
+    packed_ip_src = socket.inet_aton(src_addr)
+    packed_ip_dest = socket.inet_aton(dest_addr[0])
+
+    # Pack 16-bit ints
+    src_port = socket.htons(src_port)
+    dest_port = socket.htons(dest_addr[1])
+
+    # Pack 32-bit integers
+    packet_len = length
+
+    packed_data = struct.pack('!B4sH4sHI', priority, packed_ip_src, src_port, packed_ip_dest, dest_port, packet_len)
 
     if not os.path.exists(filename):
         print(f"File {filename} not found!")
@@ -49,7 +68,10 @@ def get_packet(s, filename, dest_addr, rate, seq_no, length, priority):
                 current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
                 print(f"send time:\t{current_time}\nrequester addr:\t{address}\nSequence num::\t{seq_no}\nlength:\t\t0\npayload:\t\n")
                 break
-            
+            bps = file_packet_size + 17 
+            packets_per_window = bps/window
+            print('file_data_length',len(data))
+            exit(1)
             header = struct.pack('!cII', b'D', socket.htonl(seq_no), len(data))
             packet = header + data
             total_length += len(packet)
@@ -64,22 +86,7 @@ def get_packet(s, filename, dest_addr, rate, seq_no, length, priority):
             seq_no += 1
             time.sleep(1.0/rate)
 
-    # below code creates the new packet with old appened
-    length = final_size
-    src_addr, src_port = s.getsockname()
 
-    # Convert IP addresses to network byte order
-    packed_ip_src = socket.inet_aton(src_addr)
-    packed_ip_dest = socket.inet_aton(dest_addr[0])
-
-    # Pack 16-bit ints
-    src_port = socket.htons(src_port)
-    dest_port = socket.htons(dest_addr[1])
-
-    # Pack 32-bit integers
-    packet_len = socket.htonl(length)
-
-    packed_data = struct.pack('!B4sH4sHI', priority, packed_ip_src, src_port, packed_ip_dest, dest_port, packet_len)
 
 
    # unpacked_ip_src = struct.unpack('!I', packed_ip_src)[0]
@@ -87,8 +94,6 @@ def get_packet(s, filename, dest_addr, rate, seq_no, length, priority):
     final_packet = packed_data + header + data
     print(final_packet)
     return final_packet,seq_no
-    
-
     
 
 if __name__ == '__main__':
@@ -126,13 +131,21 @@ if __name__ == '__main__':
                 # Listen for incoming request packets
                 data, addr = s.recvfrom(4096)
                 print(data)
-                packet_type, _, _ = struct.unpack('!cII', data[17:26])
+                file_packet_size, packet_type, seq_no, window = struct.unpack('!IcII', data[13:26])
+                # file_packet_size = struct.unpack('!I', data[13:17])[0]
+                print(file_packet_size)
                 if packet_type == b'R':
                     requested_file = data[26:].decode()
-                    window = data[21:].decode()
-                    print(window)
+                    window = socket.ntohl(window) 
+                    seq_no = socket.ntohl(seq_no)
+                    bps = file_packet_size + 17 
+                    packets_per_window = bps/window
+                    print('window',window)
                     print('file',requested_file)
-                    final_packet,curent_seq_no = get_packet(s, requested_file, (addr[0], args.g), args.r, args.q, args.l, args.i)
+                    print('file_packet_size',packets_per_window)
+                  #  exit(1)
+                    packet_buffer = {}
+                    final_packet,curent_seq_no = get_packet(s, requested_file, (addr[0], args.g), args.r, args.q, args.l, args.i, file_packet_size)
                     while not receive_ack(s,curent_seq_no,args.t):
                         retransmissions +=1
                         send_to_emulator(s, final_packet, args.f, args.e)

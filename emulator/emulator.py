@@ -43,7 +43,8 @@ class Emulator:
         # int conversions
         src_port = socket.ntohs(unpacked_data[2])
         dest_port = socket.ntohs(unpacked_data[4])
-        length = socket.ntohl(unpacked_data[5])
+        length = unpacked_data[5]
+        print('length', length)
 
         packet = Packet(priority, ip_src, src_port, ip_dest, dest_port, length)
         return packet

@@ -48,6 +48,7 @@ def send_requests(trackers, s, args):
     
     # len of new packet == length of old
     packet_len = len(old_packet)
+    print('packet_len', packet_len)
 
     # create new packet
     packed_data = struct.pack('!B4sH4sHI', priority, packed_ip_src, src_port, packed_ip_dest, dest_port, packet_len)
