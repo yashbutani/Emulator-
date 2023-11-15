@@ -1,6 +1,7 @@
 import argparse
 import socket
 import time
+import math
 import struct
 import os
 from datetime import datetime
@@ -75,13 +76,14 @@ def send_packets(s, filename, sender_info, window):
         print(f"File {filename} not found!")
         return
 
-    total_length = 0
     final_size = 0
 
     # TODO calculate sequence number
     with open(filename, 'rb') as file:
         while True:
             data = file.read(sender_info.pload_len)
+           # data_remaining = file.size
+
             print(len(data))
             print(sender_info.pload_len)
             seq_no = 1
@@ -118,41 +120,60 @@ def send_packets(s, filename, sender_info, window):
                 payload = emulator_header + sender_header
                 send_to_emulator(s, payload, sender_info.em_host, sender_info.em_port)
                 print("Working2")
-                break
+                return True
 
 
             # combime both packet headers and payload data
             #packet = emulator_header + sender_header + data
             
 
-            data_per_packet = len(data)//window
+            win = 0
+            final = False
+            if len(data) == sender_info.pload_len:
+                win = window
+            else:
+                win = 1
+                final = True
+
+
+            data_per_packet = math.ceil(len(data)//win)
             print(len(data))
 
             
             packet_buffer = {}
             end = data_per_packet
             start = 0
-            win = 0
-            
-            if len(data) == sender_info.pload_len:
-                win = window
-            else:
-                win = sender_info.pload_len - len(data)
+
+          #  data_remaining -= len(data)
+
 
             for i in range(win):
-                payload = data[start:end]
+                if final:
+                    print("final")
+                    payload = data
+                else:
+                    payload = data[start:end]
+              # data_remaining -= len(payload)
+               # print('data_remaining', data_remaining)
+                print('start', start)
+                print('end', end)
                 end += data_per_packet
                 start += data_per_packet
                 packet_buffer[seq_no] = False
+
+
                # packet_seq[current_seq_no] = payload
 
-                if(len(data) != sender_info.pload_len): # final packet -> wait for ack??
-                    payload = data[start:]
+                # print('i', i)
+                # print('win', win)
+                # if(i == win-1 and len(data) != sender_info.pload_len): # final packet -> wait for ack??
+                #     print(data_remaining)
+                #     print(start)
+                #     print(i)
+                #     payload = data[start:(end-data_remaining)]
                 
                 payload = emulator_header + sender_header + payload
                 send_to_emulator(s, payload, sender_info.em_host, sender_info.em_port)
-    
-
 
                 #while packet_buffer: # loop until all packets have been acked 
                 for seq in packet_buffer:
@@ -283,7 +304,10 @@ if __name__ == '__main__':
                 print(window)
                 if packet_type == b'R':
                     requested_file = data[26:].decode()
-                    send_packets(s, requested_file, sender_info, window)
+                    if send_packets(s, requested_file, sender_info, window):
+                        break
+                    else:
+                        continue
 
                 # if packet_type == b'A':
                 #     pass
@@ -328,5 +352,3 @@ if __name__ == '__main__':
             print("\nShutting down sender...")
         finally:
             s.close()
-
-        print(retransmissions/transmissions)

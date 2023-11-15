@@ -20,6 +20,7 @@ def write_to_file(file_name, data_buffer):
     with open(file_name, 'a') as file:
         for _, payload in sorted_buffer:
             file.write(payload.decode())
+            print(payload.decode())
 
 
 def send_requests(trackers, s, args):    
@@ -128,7 +129,7 @@ def handle_packets(sock, args, ack_em_header):
             data_buffer.append((seq_num, payload))
             print("test3")
 
-            if len(data_buffer) == args.window:
+            if len(data_buffer) <= args.window:
                 write_to_file(args.file, data_buffer)
                 data_buffer = []
             print("test4")
