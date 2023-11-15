@@ -27,7 +27,7 @@ def send_requests(trackers, s, args):
     # get destination from trackers
     for tracker in trackers:            # TODO important -> what will happen if there are multiple trakers!!!
         packet_type = b'R'
-        seq_num = socket.htonl(0)
+        seq_num = 0
         window = args.window
         old_packet = struct.pack("!cII", packet_type, seq_num, window) + args.file.encode()
 
@@ -72,11 +72,11 @@ def send_requests(trackers, s, args):
 def handle_packets(sock, args, ack_em_header):
     sender_stats = {}
     data_buffer = []
-
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
     while True:
         #print("hello")
         data, addr = sock.recvfrom(65535)  # Maximum UDP packet size
-        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        
         print(data)
         try:
             packet_type, seq_num, length = struct.unpack("!cII", data[17:26])
@@ -86,7 +86,7 @@ def handle_packets(sock, args, ack_em_header):
             print(packet_type)
 
 
-        seq_num = socket.ntohl(seq_num)  # Convert seq_num from network byte order to host byte order
+        #seq_num = socket.ntohl(seq_num)  # Convert seq_num from network byte order to host byte order
         payload = data[26:]
 
 
@@ -114,7 +114,7 @@ def handle_packets(sock, args, ack_em_header):
             print(f"sender addr:\t{sender_addr}")
             print(f"Sequence num:\t{seq_num}")
             print(f"length:\t\t{len(payload)}")
-            print(f"payload:\t{payload[:4].decode('utf-8', 'ignore')}")  # Print only first few bytes of the payload
+            print(f"payload:\t{payload.decode('utf-8', 'ignore')}")  # Print only first few bytes of the payload
            
             # Update stats for the sender
             sender_stats[key]["total_packets"] += 1
@@ -127,9 +127,13 @@ def handle_packets(sock, args, ack_em_header):
             sock.sendto(ack, (args.e_hostname, args.e_port))
             print("test2")
             data_buffer.append((seq_num, payload))
-            print("test3")
 
             if len(data_buffer) <= args.window:
+                # with open('log', 'a') as f:
+                #     sorted_buffer = sorted(data_buffer, key=lambda x: x[0])
+                #     f.write("\nSorted Buffer:\n")
+                #     f.write(str(sorted_buffer))
+                # print('data_buffer', data_buffer)
                 write_to_file(args.file, data_buffer)
                 data_buffer = []
             print("test4")

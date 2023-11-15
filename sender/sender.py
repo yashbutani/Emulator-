@@ -52,15 +52,18 @@ def receive_ack(sock, expected_seq_no, timeout, packet_buffer):
     try:
         sock.settimeout(timeout)
         #while True:
-        print("test")
+       # print("test")
         ack_packet, _ = sock.recvfrom(1024)
         ack_type, ack_seq_no = struct.unpack('!cI', ack_packet[17:22])
-        print(ack_type)
+
+        # print(ack_type)
+        # print(ack_seq_no)
         if ack_type == b'A' and ack_seq_no == expected_seq_no:
             if packet_buffer[expected_seq_no] == False:
-                print("ACK")
+              #  print("ACK")
                 return True  # ACK received
     except socket.timeout:
+        print('56778')
         return False  # ACK not received within the timeout
 
 def send_packets(s, filename, sender_info, window):
@@ -77,20 +80,18 @@ def send_packets(s, filename, sender_info, window):
         return
 
     final_size = 0
+    total_retransmissions = 0
+    total_transmissions = 0
+    seq_no = 1
 
     # TODO calculate sequence number
     with open(filename, 'rb') as file:
         while True:
             data = file.read(sender_info.pload_len)
-           # data_remaining = file.size
-
-            print(len(data))
-            print(sender_info.pload_len)
-            seq_no = 1
             if not data:
-                print("\nEND Packet")
+               # print("\nEND Packet")
                 # Sending the END packet
-                sender_header = struct.pack('!cII', b'E', socket.htonl(seq_no), 0)
+                sender_header = struct.pack('!cII', b'E', seq_no, 0)
 
                 # final_size = total_length + len(header)
                 # # s.sendto(header, dest_addr) wait
@@ -98,7 +99,7 @@ def send_packets(s, filename, sender_info, window):
                 # print(f"send time:\t{current_time}\nrequester addr:\t{'hit'}\nSequence num::\t{seq_no}\nlength:\t\t0\npayload:\t\n")
             else:
                 # Send data Packet
-                sender_header = struct.pack('!cII', b'D', socket.htonl(seq_no), len(data)) # header for file payload
+                sender_header = struct.pack('!cII', b'D', seq_no, len(data)) # header for file payload
             
             payload_length = len(sender_header) + len(data)
             src_addr, src_port = s.getsockname()
@@ -114,18 +115,14 @@ def send_packets(s, filename, sender_info, window):
             emulator_header = struct.pack('!B4sH4sHI', sender_info.priority, packed_ip_src, src_port, packed_ip_dest, dest_port, payload_length)
 
             end = struct.unpack('!c', sender_header[:1])[0]
-            print(end)
+            #print(end)
             if (end == b'E'):
-                print("Working")
+               # print("Working")
                 payload = emulator_header + sender_header
                 send_to_emulator(s, payload, sender_info.em_host, sender_info.em_port)
-                print("Working2")
+                print(total_retransmissions/total_transmissions)
+               # print("Working2")
                 return True
-
-
-            # combime both packet headers and payload data
-            #packet = emulator_header + sender_header + data
-            
 
             win = 0
             final = False
@@ -135,132 +132,52 @@ def send_packets(s, filename, sender_info, window):
                 win = 1
                 final = True
 
-
             data_per_packet = math.ceil(len(data)//win)
-            print(len(data))
-
-            
             packet_buffer = {}
             end = data_per_packet
             start = 0
 
-          #  data_remaining -= len(data)
-
-
             for i in range(win):
+                print(seq_no)
                 if final:
-                    print("final")
+                   # print("final")
                     payload = data
                 else:
                     payload = data[start:end]
-              # data_remaining -= len(payload)
-               # print('data_remaining', data_remaining)
-                print('start', start)
-                print('end', end)
+
                 end += data_per_packet
                 start += data_per_packet
                 packet_buffer[seq_no] = False
-
-
-               # packet_seq[current_seq_no] = payload
-
-                # print('i', i)
-                # print('win', win)
-                # if(i == win-1 and len(data) != sender_info.pload_len): # final packet -> wait for ack??
-                #     print(data_remaining)
-                #     print(start)
-                #     print(i)
-                #     payload = data[start:(end-data_remaining)]
-                
                 payload = emulator_header + sender_header + payload
                 send_to_emulator(s, payload, sender_info.em_host, sender_info.em_port)
+                total_transmissions += 1
 
-                #while packet_buffer: # loop until all packets have been acked 
+                print('before the loop', packet_buffer)
                 for seq in packet_buffer:
-                    #if packet_buffer[seq] == False:
-                    if receive_ack(s,seq_no,args.t, packet_buffer):
-                        print('ACK Recieved')
-                        packet_buffer[seq_no] = True
-                        seq_no += 1
-                    else: 
-                        while not receive_ack(s,seq_no,args.t,packet_buffer):#while the ack is not recieved for the seq no
-                            print("ACK Not Recieved")
-                            retransmissions +=1
-                            send_to_emulator(s, payload, sender_info.em_host, sender_info.em_port)
-                            if retransmissions > 5: 
-                                print(f"Gave up on packet with sequence number {payload}")
-                                continue
+                    print('seq', seq)
+                    print('if statement:', packet_buffer[seq])
+                    if packet_buffer[seq] != True:
+                        if receive_ack(s,seq,args.t, packet_buffer):
+                            print('ACK RECEIVED')
+                            packet_buffer[seq] = True
+                            print(packet_buffer)
+                            seq_no += 1
+                            sender_header = struct.pack('!cII', b'D', seq_no, len(data))
+                        else: 
+                            retransmissions = 0
+                            while not receive_ack(s,seq,args.t,packet_buffer):# while the ack is not recieved for the seq no
+                                print('restramission')
+                                retransmissions += 1
+                                send_to_emulator(s, payload, sender_info.em_host, sender_info.em_port)
+                                total_transmissions += 1
+                                if retransmissions > 5: 
+                                   # print(f"Gave up on packet with sequence number {payload}")
+                                    total_retransmissions += retransmissions
+                                    break
 
-              #  packet_buffer[sender_info.seq_no] = payload
+        
+      #  number of retransmissions / total number of transmissions
 
-
-
-            #total_length += len(packet)
-
-            # emulator header completed now add data from the file and construct the packet_buffer
-            # packet_buffer = {} #mapping of seq_no -> ack {seq_no : ACK }
-            # packet_seq = {} #mapping of sequence num to packet {seq_no : final packet }
-
-            # while 
-
-
-            # while not all_data_sent:
-            #     if len(packet_buffer) < sender_info.window:
-            #         packet_buffer[sender_info.seq_no] = packet
-            #         packet_seq[sender_info.seq_no] = packet
-            #         time.sleep(0.01)  # Wait for 0.01 seconds before sending the next packet
-            #         send_to_emulator(s, packet, sender_info.em_host, sender_info.em_port)
-
-
-
-            #     # Check for ACKs
-            #     readable, writable, exceptional = s.select([s], [], [], sender_info.timeout)
-            #     for sock in readable:
-            #         ack_packet = s.recv(1024)
-            #         # Extract ACK number and remove from packet_buffer
-
-            #     # Check if all packets have been sent and all ACKs received
-            #     all_data_sent = check_all_data_sent_and_acked()
-
-
-
-        #     bps = file_packet_size + 17 
-        #     packets_per_window = bps/window
-
-        #     data_rate = rate * length
-
-        #     milliseconds = 10^3
-        #     packets_per_milli = (10^3)/rate
-
-        #     for i in range(packets_per_milli):
-
-        #         pass
-        #     # send one packet every 
-        #     # Since a second has 1000 milliseconds, and you need to send 100 packets in that time, you should aim to send one packet every 10 milliseconds.
-
-        #     print('file_data_length',len(data))
-        #     header = struct.pack('!cII', b'D', socket.htonl(seq_no), len(data))
-        #     packet = header + data
-        #     total_length += len(packet)
-
-        #   #  s.sendto(packet, dest_addr) # wait to send... i think -> send to emulator which determines order
-        #     current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-
-        #     # Print the sender's log
-        #     print("\nDATA Packet")
-        #     print(f"send time:\t{current_time}\nrequester addr:\t{address}\nSequence num::\t{seq_no}\nlength:\t\t{len(data)}\npayload:\t{data[:4].decode('utf-8', 'ignore')}")
-            
-        #     seq_no += 1
-        #     time.sleep(1.0/rate)
-
-
-
-
-   # unpacked_ip_src = struct.unpack('!I', packed_ip_src)[0]
-   # unpacked_ip_dest = struct.unpack('!I', packed_ip_dest)[0]
-    # final_packet = packed_data + header + data
-    # print(final_packet)
-    # return final_packet,seq_no
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -299,9 +216,9 @@ if __name__ == '__main__':
                 # Listen for incoming request packets
                 data, addr = s.recvfrom(4096)
                 sender_info = Sender(addr[0], args.g, args.r, args.q, args.l, args.f, args.e, args.i, args.t)
-                print(data)
+               # print(data)
                 packet_type, seq_no, window = struct.unpack('!cII', data[17:26])
-                print(window)
+              #  print(window)
                 if packet_type == b'R':
                     requested_file = data[26:].decode()
                     if send_packets(s, requested_file, sender_info, window):
