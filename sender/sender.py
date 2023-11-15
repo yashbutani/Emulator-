@@ -49,22 +49,47 @@ def send_to_emulator(s, final_packet, dest_host, dest_port):
 
 def receive_ack(sock, expected_seq_no, timeout, packet_buffer):
     """Wait for an ACK packet."""
-    try:
-        sock.settimeout(timeout)
-        #while True:
-       # print("test")
-        ack_packet, _ = sock.recvfrom(1024)
-        ack_type, ack_seq_no = struct.unpack('!cI', ack_packet[17:22])
+    timeout_ms = timeout  # 1000 milliseconds
+    start_time = time.time()
 
-        # print(ack_type)
-        # print(ack_seq_no)
-        if ack_type == b'A' and ack_seq_no == expected_seq_no:
-            if packet_buffer[expected_seq_no] == False:
-              #  print("ACK")
-                return True  # ACK received
-    except socket.timeout:
-        print('56778')
-        return False  # ACK not received within the timeout
+    while True:
+        current_time = time.time()
+        elapsed_time_ms = (current_time - start_time) * 1000  # Convert to milliseconds
+
+        # Check if timeout duration in milliseconds has been exceeded
+        if elapsed_time_ms > timeout_ms:
+            break
+
+        # Set the socket's timeout for the remaining time
+        remaining_time = (timeout_ms - elapsed_time_ms) / 1000  # Convert back to seconds
+        sock.settimeout(max(remaining_time, 0))  # Ensure timeout is not negative
+
+        try:
+            ack_packet, _ = sock.recvfrom(1024)
+            ack_type, ack_seq_no = struct.unpack('!cI', ack_packet[17:22])
+
+            # Check your condition
+            if ack_type == b'A' and ack_seq_no == expected_seq_no:
+                if not packet_buffer[expected_seq_no]:
+                    return True  # ACK received
+        except socket.timeout:
+            # Handle timeout (if necessary)
+            pass
+
+    #     sock.settimeout(timeout)
+    #     #while True:
+    #    # print("test")
+    #     ack_packet, _ = sock.recvfrom(1024)
+    #     ack_type, ack_seq_no = struct.unpack('!cI', ack_packet[17:22])
+
+    #     # print(ack_type)
+    #     # print(ack_seq_no)
+    #     if ack_type == b'A' and ack_seq_no == expected_seq_no:
+    #         if packet_buffer[expected_seq_no] == False:
+    #           #  print("ACK")
+    #             return True  # ACK received
+    # except socket.timeout:
+    #     return False  # ACK not received within the timeout
 
 def send_packets(s, filename, sender_info, window):
 # UPDATE SENDER SO IT CAN:
@@ -133,22 +158,27 @@ def send_packets(s, filename, sender_info, window):
                 final = True
 
             data_per_packet = math.ceil(len(data)//win)
+            print('data_per_packet', data_per_packet)
             packet_buffer = {}
             end = data_per_packet
             start = 0
 
             for i in range(win):
-                print(seq_no)
+                
+                print('range win', range(win))
+                print('i', i)
                 if final:
                    # print("final")
                     payload = data
                 else:
                     payload = data[start:end]
 
+                my_data = struct.unpack('!c', payload)[0]
                 end += data_per_packet
                 start += data_per_packet
                 packet_buffer[seq_no] = False
                 payload = emulator_header + sender_header + payload
+                print('my_data', my_data)
                 send_to_emulator(s, payload, sender_info.em_host, sender_info.em_port)
                 total_transmissions += 1
 
@@ -166,7 +196,7 @@ def send_packets(s, filename, sender_info, window):
                         else: 
                             retransmissions = 0
                             while not receive_ack(s,seq,args.t,packet_buffer):# while the ack is not recieved for the seq no
-                                print('restramission')
+                                print('retransmission')
                                 retransmissions += 1
                                 send_to_emulator(s, payload, sender_info.em_host, sender_info.em_port)
                                 total_transmissions += 1

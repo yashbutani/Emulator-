@@ -73,6 +73,7 @@ def handle_packets(sock, args, ack_em_header):
     sender_stats = {}
     data_buffer = []
     current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+    next_window = 0
     while True:
         #print("hello")
         data, addr = sock.recvfrom(65535)  # Maximum UDP packet size
@@ -123,17 +124,21 @@ def handle_packets(sock, args, ack_em_header):
             # build an ack packet of priority 1
             ack_packet = struct.pack("!cI", b'A', seq_num)
             ack = ack_em_header + ack_packet
-            print("test")
             sock.sendto(ack, (args.e_hostname, args.e_port))
-            print("test2")
-            data_buffer.append((seq_num, payload))
 
-            if len(data_buffer) <= args.window:
-                # with open('log', 'a') as f:
-                #     sorted_buffer = sorted(data_buffer, key=lambda x: x[0])
-                #     f.write("\nSorted Buffer:\n")
-                #     f.write(str(sorted_buffer))
-                # print('data_buffer', data_buffer)
+            if next_window < seq_num:
+                tuple_to_check = (seq_num, payload)
+                next_window+=1
+                if tuple_to_check not in data_buffer:
+                    data_buffer.append((seq_num, payload))
+
+            if len(data_buffer) == args.window:
+                with open('log', 'a') as f:
+                    sorted_buffer = sorted(data_buffer, key=lambda x: x[0])
+                    f.write("\nSorted Buffer:\n")
+                    f.write(str(sorted_buffer))
+                print('data_buffer', data_buffer)
+              #  next_window += args.window
                 write_to_file(args.file, data_buffer)
                 data_buffer = []
             print("test4")

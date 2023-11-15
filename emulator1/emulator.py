@@ -85,7 +85,6 @@ class Emulator:
     def queue_packet(self, packet, table):
         if len(self.queues[packet.priority]) < self.queue_sizes:
             self.queues[packet.priority].append((packet, table))
-           # self.log(f"Packet queued", packet)
         else:
             self.log(f"PACKET DROPPPED: queue for priority {packet.priority} is full.", packet)
 
@@ -102,34 +101,6 @@ class Emulator:
         else: 
             # drop packet and event should be logged
             self.log("PACKET DROPPED: Lossy link probability realized", packet)
-
-
-        # for entry in self.forwarding_table:
-        #     print('inside for')
-        #     ip_src = socket.gethostbyname(entry[0])
-        #     port_src = int(entry[1])
-        #     ip_dest = socket.gethostbyname(entry[2])
-        #     port_dest = int(entry[3])
-
-        #     if ip_src != src_addr and port_src != src_port: # ignore packets that don't corresponse to emulator's own hostname and port
-        #         continue
-
-        #     #if ip_dest == destination_ip and port_dest == destination_port: # indicates a match
-        #     next_hop_host = socket.gethostbyname(entry[4])
-        #     next_hop_port = int(entry[5])
-        #     delay = int(entry[6])
-
-        #     time.sleep(delay/1000)  # emulator delays before sending
-
-        #     loss_prob = int(entry[7])/ 100
-        #     if random.uniform(0, 1) >= loss_prob:
-        #         packed_packet = self.pack_data(packet,byte_packet)
-        #         print("next hop",next_hop_host,next_hop_port)
-        #         self.socket.sendto(packed_packet, (next_hop_host, next_hop_port)) 
-        #         print("Sending packet to the next hop")
-        #     else: 
-        #         # drop packet and event should be logged
-        #         self.log("FAILURE: no forwarding entry found", packet)
 
 
     def forward_packets(self, packet, byte_packet):

@@ -213,19 +213,6 @@ if __name__ == '__main__':
             for word in content:
                 entry_names.append(word)
             forwarding_table.append(entry_names)
-
-
-    # # Read the forwarding table from the specified file
-    # forwarding_table = {}
-    # with open(args.f, 'r') as f:
-    #     for line in f:
-    #         parts = line.strip().split()
-    #         if len(parts) == 6:
-    #             dest_ip, dest_port, next_hop_ip, next_hop_port, delay, loss_prob = parts
-    #             forwarding_table[(dest_ip, int(dest_port))] = ((next_hop_ip, int(next_hop_port)), int(delay), float(loss_prob))
-
-    # Set the queue sizes for each priority
-    #queue_sizes = {1: args.q, 2: args.q, 3: args.q}
     
     # Initialize the emulator with the loaded forwarding table and log file
     emulator = Emulator(args.p, queue_size, forwarding_table, args.l)
