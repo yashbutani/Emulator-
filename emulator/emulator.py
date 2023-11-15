@@ -34,6 +34,7 @@ class Emulator:
         self.log_file = log_file
 
     def unpack_data(self, packet):
+        print(packet)
         unpacked_data = struct.unpack('!B4sH4sHI', packet[:17])
         priority = unpacked_data[0]
 
@@ -171,6 +172,7 @@ class Emulator:
         while True:
             try:
                 bytes_packet, addr = self.socket.recvfrom(1024)
+                print(len(bytes_packet))
                 arrival_time = datetime.now()
                 packet = self.unpack_data(bytes_packet) # convert packet
                # priority, src_addr, src_port, dest_addr, dest_port, length, data = self.unpack_data(bytes_packet)

@@ -27,7 +27,7 @@ def send_requests(trackers, s, args):
     for tracker in trackers:            # TODO important -> what will happen if there are multiple trakers!!!
         packet_type = b'R'
         seq_num = socket.htonl(0)
-        window = socket.htonl(args.window)
+        window = args.window
         old_packet = struct.pack("!cII", packet_type, seq_num, window) + args.file.encode()
 
         src_addr, src_port = s.getsockname()
@@ -77,7 +77,12 @@ def handle_packets(sock, args, ack_em_header):
         data, addr = sock.recvfrom(65535)  # Maximum UDP packet size
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
         print(data)
-        packet_type, seq_num, length = struct.unpack("!cII", data[17:26])
+        try:
+            packet_type, seq_num, length = struct.unpack("!cII", data[17:26])
+            print(packet_type)
+        except:
+            packet_type, seq_num = struct.unpack("!cI", data[:5])
+            print(packet_type)
 
 
         seq_num = socket.ntohl(seq_num)  # Convert seq_num from network byte order to host byte order
@@ -96,6 +101,9 @@ def handle_packets(sock, args, ack_em_header):
                 "sender": sender_addr,
             }
 
+        if packet_type == b'A':
+            print("ACK")
+            pass
 
         if packet_type == b'D':
             # Print details for the data packet
@@ -114,12 +122,16 @@ def handle_packets(sock, args, ack_em_header):
             # build an ack packet of priority 1
             ack_packet = struct.pack("!cI", b'A', seq_num)
             ack = ack_em_header + ack_packet
+            print("test")
             sock.sendto(ack, (args.e_hostname, args.e_port))
+            print("test2")
             data_buffer.append((seq_num, payload))
+            print("test3")
 
-            if (seq_num % args.window) == 0:
+            if len(data_buffer) == args.window:
                 write_to_file(args.file, data_buffer)
                 data_buffer = []
+            print("test4")
             # saves the data to the file in the order of the packets' sequence numbers
 
 
