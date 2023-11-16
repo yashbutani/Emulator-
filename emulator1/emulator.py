@@ -37,7 +37,6 @@ class Emulator:
         self.log_file = log_file
 
     def unpack_data(self, packet):
-     #   print(packet)
         unpacked_data = struct.unpack('!B4sH4sHI', packet[:17])
         priority = unpacked_data[0]
 
@@ -49,7 +48,6 @@ class Emulator:
         src_port = socket.ntohs(unpacked_data[2])
         dest_port = socket.ntohs(unpacked_data[4])
         length = unpacked_data[5]
-       # print('length', length)
 
         packet = Packet(priority, ip_src, src_port, ip_dest, dest_port, length)
         return packet
@@ -70,23 +68,21 @@ class Emulator:
 
         return final_packet
 
-    def log(self, message, data_packet=tuple):
-        packet_type, seq_num, length = struct.unpack("!cII", data_packet[0][17:26])
+
+    def log(self, message, data_packet=None):
         with open(self.log_file, 'a') as f:
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-            log_message = f"{timestamp} - {message}"
-            if data_packet[0]:
-                log_message += (
-                                f"\nTable: {data_packet[1].ip_dest}, "
-                                f"\nPacket_type {packet_type}, "
-                                f"\nseq_num {seq_num}")
+            log_message = f"{timestamp} - {message}\n"
+            if data_packet:
+                log_message += (f"Src: {data_packet.ip_src}:{data_packet.src_port}\n"
+                                f"Dst: {data_packet.ip_dest}:{data_packet.dest_port}\n"
+                                f"Priority: {data_packet.priority}\n"
+                                f"Length: {data_packet.length}\n\n")
             f.write(log_message)
-
 
     def queue_packet(self, packet, table):
         if len(self.queues[packet.priority]) < self.queue_sizes:
             self.queues[packet.priority].append((packet, table))
-           # self.log(f"Packet queued", (packet,table))
         else:
             self.log(f"PACKET DROPPPED: queue for priority {packet.priority} is full.", packet)
 
@@ -100,10 +96,10 @@ class Emulator:
         if random.uniform(0, 1) >= loss_prob:
             packed_packet = self.pack_data(packet,byte_packet)
             self.socket.sendto(packed_packet, (table.next_hop_host, table.next_hop_port))
-           # self.log("PACKET ADDED:", (byte_packet,table))
         else: 
             # drop packet and event should be logged
             self.log("PACKET DROPPED: Lossy link probability realized", packet)
+            
 
 
     def forward_packets(self, packet, byte_packet):
@@ -118,16 +114,9 @@ class Emulator:
 
         # look for match in forwarding table
         for entry in self.forwarding_table:
-            #print(entry)
             table = Forwarding(socket.gethostbyname(entry[0]), int(entry[1]), socket.gethostbyname(entry[2]), int(entry[3]), socket.gethostbyname(entry[4]), int(entry[5]), int(entry[6]), int(entry[7]))
-            #print(table.ip_dest)
-            #print(destination_ip)
 
-            if table.ip_src != src_addr and table.port_src != src_port:
-                continue
-
-            if table.ip_dest == destination_ip and table.port_dest == destination_port:
-              #  print('valid')
+            if table.ip_src == src_addr and table.port_src == src_port and table.ip_dest == destination_ip and table.port_dest == destination_port:
                 self.queue_packet(packet, table)
                 match = True
 
@@ -137,25 +126,10 @@ class Emulator:
         
 
         for priority in sorted(self.queues.keys()):
-            print(self.queues)
             while self.queues[priority]:
-               # print(len(self.queues[priority]))
-              #  print("REMOVING QUEUE")
                 packet, table = self.queues[priority].pop(0)
-               # print(len(self.queues[priority]))
                 self.send_packet(packet, table, byte_packet)
 
-
-
-        # exit(1)
-        # self.queue_packet(packet)
-
-        # # Forward packets from the queues based on priority
-        # for priority in sorted(self.queues.keys()):
-        #     while self.queues[priority]:
-        #         packet = self.queues[priority].pop(0)
-        #         print(packet)
-        #         self.send_packet(packet, byte_packet)
 
     def run(self):
         while True:
@@ -191,19 +165,6 @@ if __name__ == '__main__':
             for word in content:
                 entry_names.append(word)
             forwarding_table.append(entry_names)
-
-
-    # # Read the forwarding table from the specified file
-    # forwarding_table = {}
-    # with open(args.f, 'r') as f:
-    #     for line in f:
-    #         parts = line.strip().split()
-    #         if len(parts) == 6:
-    #             dest_ip, dest_port, next_hop_ip, next_hop_port, delay, loss_prob = parts
-    #             forwarding_table[(dest_ip, int(dest_port))] = ((next_hop_ip, int(next_hop_port)), int(delay), float(loss_prob))
-
-    # Set the queue sizes for each priority
-    #queue_sizes = {1: args.q, 2: args.q, 3: args.q}
     
     # Initialize the emulator with the loaded forwarding table and log file
     emulator = Emulator(args.p, queue_size, forwarding_table, args.l)
