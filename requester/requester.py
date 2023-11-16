@@ -135,8 +135,8 @@ def handle_packets(sock, args, ack_em_header):
 
             # create data buffer
                 # data_buffer.append((seq_num, payload))
-
-            if len(data_buffer) == args.window:
+           # print('length', length)
+            if len(data_buffer) == args.window or length != args.window:
                 print(data_buffer)
                 sorted_buffer = {}
                 sorted_buffer = sorted(data_buffer.items(), key=lambda x: x[0])

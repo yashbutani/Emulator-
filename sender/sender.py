@@ -196,10 +196,12 @@ def send_packets(s, filename, sender_info, window):
           #  print(packet_buffer)
           #  print(ack_tracker)
             # Send all packets in the window
+            print('packet_buffer', packet_buffer)
             for _, packet in packet_buffer.items():
                 send_to_emulator(s, packet, sender_info.em_host, sender_info.em_port)
                 time.sleep(1.0 / sender_info.rate)
                 ack_tracker = receive_ack(s, ack_tracker, sender_info.timeout)
+            print('ack_tracker', ack_tracker)
            # print('after data send tracker',ack_tracker)
 
             # Wait for ACKs and handle retransmissions
