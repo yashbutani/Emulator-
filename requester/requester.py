@@ -15,12 +15,12 @@ class Tracker:
         
 
 
-def write_to_file(file_name, data_buffer):
-    sorted_buffer = sorted(data_buffer, key=lambda x: x[0])
+def write_to_file(file_name, sorted_buffer, writen_seq):
     with open(file_name, 'a') as file:
-        for _, payload in sorted_buffer:
+        for seq_num, payload in sorted_buffer:
             file.write(payload.decode())
-            print(payload.decode())
+            writen_seq.append(seq_num)
+    return writen_seq
 
 
 def send_requests(trackers, s, args):    
@@ -71,7 +71,8 @@ def send_requests(trackers, s, args):
 
 def handle_packets(sock, args, ack_em_header):
     sender_stats = {}
-    data_buffer = []
+    data_buffer = {}
+    writen_seq = []
     current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
     next_window = 0
     while True:
@@ -79,12 +80,12 @@ def handle_packets(sock, args, ack_em_header):
         data, addr = sock.recvfrom(65535)  # Maximum UDP packet size
         
         print(data)
-        try:
-            packet_type, seq_num, length = struct.unpack("!cII", data[17:26])
-            print(packet_type)
-        except:
-            packet_type, seq_num = struct.unpack("!cI", data[:5])
-            print(packet_type)
+       # try:
+        packet_type, seq_num, length = struct.unpack("!cII", data[17:26])
+        print(packet_type)
+        # except:
+        #     packet_type, seq_num = struct.unpack("!cI", data[:5])
+        #     print(packet_type)
 
 
         #seq_num = socket.ntohl(seq_num)  # Convert seq_num from network byte order to host byte order
@@ -103,45 +104,45 @@ def handle_packets(sock, args, ack_em_header):
                 "sender": sender_addr,
             }
 
-        if packet_type == b'A':
-            print("ACK")
-            pass
 
         if packet_type == b'D':
             # Print details for the data packet
             # TODO suppress data pack info
-            print(f"\nDATA Packet")
-            print(f"recv time:\t{current_time}")
-            print(f"sender addr:\t{sender_addr}")
-            print(f"Sequence num:\t{seq_num}")
-            print(f"length:\t\t{len(payload)}")
-            print(f"payload:\t{payload.decode('utf-8', 'ignore')}")  # Print only first few bytes of the payload
+            # print(f"\nDATA Packet")
+            # print(f"recv time:\t{current_time}")
+            # print(f"sender addr:\t{sender_addr}")
+            # print(f"Sequence num:\t{seq_num}")
+            # print(f"length:\t\t{len(payload)}")
+            # print(f"payload:\t{payload.decode('utf-8', 'ignore')}")  # Print only first few bytes of the payload
            
             # Update stats for the sender
             sender_stats[key]["total_packets"] += 1
             sender_stats[key]["total_bytes"] += len(payload)
 
-            # build an ack packet of priority 1
-            ack_packet = struct.pack("!cI", b'A', seq_num)
-            ack = ack_em_header + ack_packet
-            sock.sendto(ack, (args.e_hostname, args.e_port))
 
-            if next_window < seq_num:
-                tuple_to_check = (seq_num, payload)
-                next_window+=1
-                if tuple_to_check not in data_buffer:
-                    data_buffer.append((seq_num, payload))
+
+            if seq_num not in writen_seq:
+            # build an ack packet of priority 1
+                ack_packet = struct.pack("!cI", b'A', seq_num)
+                ack = ack_em_header + ack_packet
+                sock.sendto(ack, (args.e_hostname, args.e_port))
+                print(seq_num)
+                data_buffer[seq_num] = payload
+
+            # create data buffer
+                # data_buffer.append((seq_num, payload))
 
             if len(data_buffer) == args.window:
-                with open('log', 'a') as f:
-                    sorted_buffer = sorted(data_buffer, key=lambda x: x[0])
-                    f.write("\nSorted Buffer:\n")
-                    f.write(str(sorted_buffer))
-                print('data_buffer', data_buffer)
+                sorted_buffer = {}
+                sorted_buffer = sorted(data_buffer.items(), key=lambda x: x[0])
+                # with open('log', 'a') as f:
+                #    # f.write("\nSorted Buffer:\n")
+                #     f.write(str(sorted_buffer))
+                # print('data_buffer', sorted_buffer)
               #  next_window += args.window
-                write_to_file(args.file, data_buffer)
-                data_buffer = []
-            print("test4")
+                writen_seq = write_to_file(args.file, sorted_buffer, writen_seq) 
+                data_buffer = {}
+                
             # saves the data to the file in the order of the packets' sequence numbers
 
 

@@ -47,49 +47,74 @@ class Sender():
 def send_to_emulator(s, final_packet, dest_host, dest_port):
     s.sendto(final_packet, (dest_host, dest_port))
 
-def receive_ack(sock, expected_seq_no, timeout, packet_buffer):
+def retransmit_ack(sock, ack_tracker, timeout):
     """Wait for an ACK packet."""
-    timeout_ms = timeout  # 1000 milliseconds
-    start_time = time.time()
-
-    while True:
-        current_time = time.time()
-        elapsed_time_ms = (current_time - start_time) * 1000  # Convert to milliseconds
-
-        # Check if timeout duration in milliseconds has been exceeded
-        if elapsed_time_ms > timeout_ms:
-            break
-
-        # Set the socket's timeout for the remaining time
-        remaining_time = (timeout_ms - elapsed_time_ms) / 1000  # Convert back to seconds
-        sock.settimeout(max(remaining_time, 0))  # Ensure timeout is not negative
-
-        try:
+    try:
+        for ack in ack_tracker:
+            sock.settimeout(timeout)
             ack_packet, _ = sock.recvfrom(1024)
             ack_type, ack_seq_no = struct.unpack('!cI', ack_packet[17:22])
 
-            # Check your condition
-            if ack_type == b'A' and ack_seq_no == expected_seq_no:
-                if not packet_buffer[expected_seq_no]:
-                    return True  # ACK received
-        except socket.timeout:
-            # Handle timeout (if necessary)
-            pass
+            if ack_type == b'A' and ack_seq_no in ack_tracker:
+                # we have received an ACK with that iteration
+                if ack_tracker[ack] == False:
+                    print("ACK RECEVIED")
+                    ack_tracker[ack] = True
+                    return True
+    except socket.timeout:
+        ack_tracker[ack] = False
+        return False
 
-    #     sock.settimeout(timeout)
-    #     #while True:
-    #    # print("test")
-    #     ack_packet, _ = sock.recvfrom(1024)
-    #     ack_type, ack_seq_no = struct.unpack('!cI', ack_packet[17:22])
+    return False
 
-    #     # print(ack_type)
-    #     # print(ack_seq_no)
-    #     if ack_type == b'A' and ack_seq_no == expected_seq_no:
-    #         if packet_buffer[expected_seq_no] == False:
-    #           #  print("ACK")
-    #             return True  # ACK received
-    # except socket.timeout:
-    #     return False  # ACK not received within the timeout
+def receive_ack(sock, ack_tracker, timeout):
+    """Wait for an ACK packet."""
+    try:
+        for ack in ack_tracker:
+            sock.settimeout(timeout)
+            ack_packet, _ = sock.recvfrom(1024)
+            ack_type, ack_seq_no = struct.unpack('!cI', ack_packet[17:22])
+
+            if ack_type == b'A' and ack_seq_no in ack_tracker:
+                # we have received an ACK with that iteration
+                if ack_tracker[ack] == False:
+                    print("ACK RECEVIED")
+                    ack_tracker[ack] = True
+    except socket.timeout:
+        ack_tracker[ack] = False
+
+    return ack_tracker
+
+def make_packet(seq_no, file_data):
+    handle_last_pack = False
+    if not file_data: # Create end packet header
+        sender_header = struct.pack('!cII', b'E', seq_no, 0)
+        handle_last_pack = True
+    else:
+        # Create normal data Packet header
+        sender_header = struct.pack('!cII', b'D', seq_no, len(file_data)) # header for file payloay
+    
+    payload_length = len(sender_header) + len(file_data)
+    src_addr, src_port = s.getsockname()
+
+    # Convert IP addresses to network byte order
+    packed_ip_src = socket.inet_aton(src_addr)
+    packed_ip_dest = socket.inet_aton(sender_info.req_host)
+
+    # Pack 16-bit ints, 32-bit integers don't need to be converted
+    src_port = socket.htons(src_port)
+    dest_port = socket.htons(sender_info.req_port)
+
+    emulator_header = struct.pack('!B4sH4sHI', sender_info.priority, packed_ip_src, src_port, packed_ip_dest, dest_port, payload_length)
+    
+    packet = emulator_header + sender_header + file_data
+
+    if handle_last_pack == True:
+        send_to_emulator(s, packet, sender_info.em_host, sender_info.em_port)
+        exit(1) # handle better later
+       # print(total_retransmissions/total_transmissions)
+
+    return packet
 
 def send_packets(s, filename, sender_info, window):
 # UPDATE SENDER SO IT CAN:
@@ -104,106 +129,175 @@ def send_packets(s, filename, sender_info, window):
         print(f"File {filename} not found!")
         return
 
-    final_size = 0
-    total_retransmissions = 0
-    total_transmissions = 0
     seq_no = 1
+    bytes_per_packet = sender_info.pload_len
+    current = 0
+    #chunk_size = bytes_per_packet * window
 
     # TODO calculate sequence number
     with open(filename, 'rb') as file:
         while True:
-            data = file.read(sender_info.pload_len)
-            if not data:
-               # print("\nEND Packet")
-                # Sending the END packet
-                sender_header = struct.pack('!cII', b'E', seq_no, 0)
+            file.seek(current, 0)
+            data = file.read(bytes_per_packet)
+            current += bytes_per_packet
+            print('old', data)
 
-                # final_size = total_length + len(header)
-                # # s.sendto(header, dest_addr) wait
-                # current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-                # print(f"send time:\t{current_time}\nrequester addr:\t{'hit'}\nSequence num::\t{seq_no}\nlength:\t\t0\npayload:\t\n")
-            else:
-                # Send data Packet
-                sender_header = struct.pack('!cII', b'D', seq_no, len(data)) # header for file payload
-            
-            payload_length = len(sender_header) + len(data)
-            src_addr, src_port = s.getsockname()
-
-            # Convert IP addresses to network byte order
-            packed_ip_src = socket.inet_aton(src_addr)
-            packed_ip_dest = socket.inet_aton(sender_info.req_host)
-
-            # Pack 16-bit ints, 32-bit integers don't need to be converted
-            src_port = socket.htons(src_port)
-            dest_port = socket.htons(sender_info.req_port)
-
-            emulator_header = struct.pack('!B4sH4sHI', sender_info.priority, packed_ip_src, src_port, packed_ip_dest, dest_port, payload_length)
-
-            end = struct.unpack('!c', sender_header[:1])[0]
-            #print(end)
-            if (end == b'E'):
-               # print("Working")
-                payload = emulator_header + sender_header
-                send_to_emulator(s, payload, sender_info.em_host, sender_info.em_port)
-                print(total_retransmissions/total_transmissions)
-               # print("Working2")
-                return True
-
-            win = 0
-            final = False
-            if len(data) == sender_info.pload_len:
-                win = window
-            else:
-                win = 1
-                final = True
-
-            data_per_packet = math.ceil(len(data)//win)
-            print('data_per_packet', data_per_packet)
+            # handle case when packet_data is none we can send the correct header format
             packet_buffer = {}
-            end = data_per_packet
-            start = 0
+            ack_tracker = {}
+            for p in range(window):
+                data_packet = make_packet(seq_no, data[p:p+1])
+                print(data_packet[26:].decode())
+                packet_buffer[seq_no] = data_packet
+                ack_tracker[seq_no] = False 
+                seq_no +=1
 
-            for i in range(win):
+            for seq_no in packet_buffer:
+                send_to_emulator(s, packet_buffer[seq_no], sender_info.em_host, sender_info.em_port)
+                time.sleep(1/sender_info.rate)
+                ack_tracker  = receive_ack(s, ack_tracker, sender_info.timeout)
+                # TODO if any false in ack_tracker, retransmit
+
+            print(packet_buffer)
+            print(ack_tracker)
+            missed_packets = {key: packet_buffer[key] for key in ack_tracker if not ack_tracker[key]}
+            print(missed_packets)
+
+            #{key: packet_buffer[key] for key in packet_buffer if ack_tracker.get(key, False)}
+           # print(missed_packets)
+            for seq_no in missed_packets:
+                retransmissions = 0
+                while retransmissions < 5:
+                    send_to_emulator(s, missed_packets[seq_no], sender_info.em_host, sender_info.em_port)
+                    time.sleep(1/sender_info.rate)
+                    if retransmit_ack(s, ack_tracker, sender_info.timeout):
+                        print("RETRANSMIT SUCCESS")
+                        break
+                    else:
+                        retransmissions += 1
+                        print(retransmissions)
+                        if retransmissions > 5:
+                            break
+
+
+
+
+           # ack_tracker = {key: value for key, value in ack_tracker.items() if value != True}
+
+
+            # for ack in ack_tracker:
+            #     if ack_tracker[ack] == False:
+            # retransmissions = 0
+            # # while False in ack_tracker.values():
+            # for seq_no in ack_tracker:
+            #     # if ack_tracker[value] == False:
+            #     while retransmissions < 5:
+            #         print(ack_tracker)
+            #         # create new packet based on seq_no
+
+            #         send_to_emulator(s, packet, sender_info.em_host, sender_info.em_port)
+            #         time.sleep(1/sender_info.rate)
+            #         ack_tracker = receive_ack(s, ack_tracker, sender_info.timeout)
+            #         retransmissions += 1
+            #         if retransmissions > 5:
+            #             break
+
+            
                 
-                print('range win', range(win))
-                print('i', i)
-                if final:
-                   # print("final")
-                    payload = data
-                else:
-                    payload = data[start:end]
+            
+                        
+                    
+                    # #while not receive_ack(s,seq,args.t,packet_buffer):# while the ack is not recieved for the seq no
+                    #     print('retransmission')
+                    #     retransmissions += 1
+                    #     send_to_emulator(s, payload, sender_info.em_host, sender_info.em_port)
+                    #     total_transmissions += 1
+                    #     if retransmissions > 5: 
+                    #         # print(f"Gave up on packet with sequence number {payload}")
+                    #         total_retransmissions += retransmissions
+                    #         break
+                    #retransmit 
+            
 
-                my_data = struct.unpack('!c', payload)[0]
-                end += data_per_packet
-                start += data_per_packet
-                packet_buffer[seq_no] = False
-                payload = emulator_header + sender_header + payload
-                print('my_data', my_data)
-                send_to_emulator(s, payload, sender_info.em_host, sender_info.em_port)
-                total_transmissions += 1
 
-                print('before the loop', packet_buffer)
-                for seq in packet_buffer:
-                    print('seq', seq)
-                    print('if statement:', packet_buffer[seq])
-                    if packet_buffer[seq] != True:
-                        if receive_ack(s,seq,args.t, packet_buffer):
-                            print('ACK RECEIVED')
-                            packet_buffer[seq] = True
-                            print(packet_buffer)
-                            seq_no += 1
-                            sender_header = struct.pack('!cII', b'D', seq_no, len(data))
-                        else: 
-                            retransmissions = 0
-                            while not receive_ack(s,seq,args.t,packet_buffer):# while the ack is not recieved for the seq no
-                                print('retransmission')
-                                retransmissions += 1
-                                send_to_emulator(s, payload, sender_info.em_host, sender_info.em_port)
-                                total_transmissions += 1
-                                if retransmissions > 5: 
-                                   # print(f"Gave up on packet with sequence number {payload}")
-                                    total_retransmissions += retransmissions
-                                    break
+
+
+            
+            
+            
+
+            # end = struct.unpack('!c', sender_header[:1])[0]
+            # #print(end)
+            # if (end == b'E'):
+            #    # print("Working")
+            #     payload = emulator_header + sender_header
+            #     send_to_emulator(s, payload, sender_info.em_host, sender_info.em_port)
+            #     print(total_retransmissions/total_transmissions)
+            #    # print("Working2")
+            #     return True
+            
+
+
+
+
+
+
+
+            # win = 0
+            # final = False
+            # if len(data) == sender_info.pload_len:
+            #     win = window
+            # else:
+            #     win = 1
+            #     final = True
+
+            # data_per_packet = math.ceil(len(data)//win)
+            # print('data_per_packet', data_per_packet)
+            # packet_buffer = {}
+            # end = data_per_packet
+            # start = 0
+
+            # for i in range(win):
+                
+            #     print('range win', range(win))
+            #     print('i', i)
+            #     if final:
+            #        # print("final")
+            #         payload = data
+            #     else:
+            #         payload = data[start:end]
+
+            #     my_data = struct.unpack('!c', payload)[0]
+            #     end += data_per_packet
+            #     start += data_per_packet
+            #     packet_buffer[seq_no] = False
+            #     payload = emulator_header + sender_header + payload
+            #     print('my_data', my_data)
+            #     send_to_emulator(s, payload, sender_info.em_host, sender_info.em_port)
+            #     total_transmissions += 1
+
+            #     print('before the loop', packet_buffer)
+            #     for seq in packet_buffer:
+            #         print('seq', seq)
+            #         print('if statement:', packet_buffer[seq])
+            #         if packet_buffer[seq] != True:
+            #             if receive_ack(s,seq,args.t, packet_buffer):
+            #                 print('ACK RECEIVED')
+            #                 packet_buffer[seq] = True
+            #                 print(packet_buffer)
+            #                 seq_no += 1
+            #                 sender_header = struct.pack('!cII', b'D', seq_no, len(data))
+            #             else: 
+            #                 retransmissions = 0
+            #                 while not receive_ack(s,seq,args.t,packet_buffer):# while the ack is not recieved for the seq no
+            #                     print('retransmission')
+            #                     retransmissions += 1
+            #                     send_to_emulator(s, payload, sender_info.em_host, sender_info.em_port)
+            #                     total_transmissions += 1
+            #                     if retransmissions > 5: 
+            #                        # print(f"Gave up on packet with sequence number {payload}")
+            #                         total_retransmissions += retransmissions
+            #                         break
 
         
       #  number of retransmissions / total number of transmissions
