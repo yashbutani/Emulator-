@@ -71,22 +71,22 @@ class Emulator:
         return final_packet
 
     def log(self, message, data_packet=tuple):
+        packet_type, seq_num, length = struct.unpack("!cII", data_packet[0][17:26])
         with open(self.log_file, 'a') as f:
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
             log_message = f"{timestamp} - {message}"
             if data_packet[0]:
-                log_message += (f" - Src: {data_packet[0].ip_src}:{data_packet[0].src_port}, "
-                                f"Dst: {data_packet[0].ip_dest}:{data_packet[0].dest_port}, "
-                                f"Priority: {data_packet[0].priority}, "
-                                f"Table: {data_packet[1].ip_dest}, "
-                                f"Length: {data_packet[0].length}\n")
+                log_message += (
+                                f"\nTable: {data_packet[1].ip_dest}, "
+                                f"\nPacket_type {packet_type}, "
+                                f"\nseq_num {seq_num}")
             f.write(log_message)
 
 
     def queue_packet(self, packet, table):
         if len(self.queues[packet.priority]) < self.queue_sizes:
             self.queues[packet.priority].append((packet, table))
-            self.log(f"Packet queued", (packet,table))
+           # self.log(f"Packet queued", (packet,table))
         else:
             self.log(f"PACKET DROPPPED: queue for priority {packet.priority} is full.", packet)
 
@@ -100,6 +100,7 @@ class Emulator:
         if random.uniform(0, 1) >= loss_prob:
             packed_packet = self.pack_data(packet,byte_packet)
             self.socket.sendto(packed_packet, (table.next_hop_host, table.next_hop_port))
+           # self.log("PACKET ADDED:", (byte_packet,table))
         else: 
             # drop packet and event should be logged
             self.log("PACKET DROPPED: Lossy link probability realized", packet)
@@ -138,7 +139,10 @@ class Emulator:
         for priority in sorted(self.queues.keys()):
             print(self.queues)
             while self.queues[priority]:
+               # print(len(self.queues[priority]))
+              #  print("REMOVING QUEUE")
                 packet, table = self.queues[priority].pop(0)
+               # print(len(self.queues[priority]))
                 self.send_packet(packet, table, byte_packet)
 
 

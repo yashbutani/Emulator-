@@ -79,10 +79,10 @@ def handle_packets(sock, args, ack_em_header):
         #print("hello")
         data, addr = sock.recvfrom(65535)  # Maximum UDP packet size
         
-        print(data)
+       # print(data)
        # try:
         packet_type, seq_num, length = struct.unpack("!cII", data[17:26])
-        print(packet_type)
+      #  print(packet_type)
         # except:
         #     packet_type, seq_num = struct.unpack("!cI", data[:5])
         #     print(packet_type)
@@ -119,27 +119,32 @@ def handle_packets(sock, args, ack_em_header):
             sender_stats[key]["total_packets"] += 1
             sender_stats[key]["total_bytes"] += len(payload)
 
+            
+            # ack_packet = struct.pack("!cI", b'A', seq_num)
+            # ack = ack_em_header + ack_packet
+            # sock.sendto(ack, (args.e_hostname, args.e_port))
+            
 
-
-            if seq_num not in writen_seq:
-            # build an ack packet of priority 1
+            # if we have a sequence number than we 
+          #  print('current seq num',seq_num)
+            if seq_num not in data_buffer and seq_num > next_window:
                 ack_packet = struct.pack("!cI", b'A', seq_num)
                 ack = ack_em_header + ack_packet
                 sock.sendto(ack, (args.e_hostname, args.e_port))
-                print(seq_num)
                 data_buffer[seq_num] = payload
 
             # create data buffer
                 # data_buffer.append((seq_num, payload))
 
             if len(data_buffer) == args.window:
+                print(data_buffer)
                 sorted_buffer = {}
                 sorted_buffer = sorted(data_buffer.items(), key=lambda x: x[0])
-                # with open('log', 'a') as f:
-                #    # f.write("\nSorted Buffer:\n")
-                #     f.write(str(sorted_buffer))
-                # print('data_buffer', sorted_buffer)
-              #  next_window += args.window
+                with open('log', 'a') as f:
+                   # f.write("\nSorted Buffer:\n")
+                    f.write('\n' + str(sorted_buffer))
+                #print('data_buffer', sorted_buffer)
+                next_window += args.window
                 writen_seq = write_to_file(args.file, sorted_buffer, writen_seq) 
                 data_buffer = {}
                 
