@@ -34,7 +34,6 @@ def receive_ack(sock, ack_tracker, timeout):
 
     except socket.timeout:
         pass
-        #print("no resp in timeout")
 
     return ack_tracker
 
@@ -160,7 +159,6 @@ if __name__ == '__main__':
                 data, addr = s.recvfrom(4096)
                 sender_info = Sender(addr[0], args.g, args.r, args.q, args.l, args.f, args.e, args.i, args.t)
                 packet_type, seq_no, window = struct.unpack('!cII', data[17:26])
-                print(window)
                 if packet_type == b'R':
                     requested_file = data[26:].decode()
                     percentage = send_packets(s, requested_file, sender_info, window)

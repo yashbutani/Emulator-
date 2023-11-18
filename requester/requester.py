@@ -26,7 +26,7 @@ def send_requests(trackers, s, args):
     # get destination from trackers
     for tracker in trackers:            # TODO important -> what will happen if there are multiple trakers!!!
         packet_type = b'R'
-        seq_num = 0
+        seq_num = tracker.seq_no
         window = args.window
         old_packet = struct.pack("!cII", packet_type, seq_num, window) + args.file.encode()
 
@@ -137,12 +137,11 @@ def main():
     with open('tracker.txt', 'r') as file: #you have to request from one sender at a time and then move on to the next
         content = file.readlines()
         content = [line.strip() for line in content if line.strip()]  # Avoid empty lines
-        content.sort(key=lambda content: content[1])
+        content.sort(key=lambda line: int(line.split()[1]))
         for i in content:
             filename, seq_no, hostname, port = i.split()
             tracker_arr.append(Tracker(filename, int(seq_no), hostname, int(port)))
-
-        
+            
         print('----------------------------')
         print("Requester’s print information:")
 

@@ -29,7 +29,6 @@ class Forwarding:
 class Emulator:
     def __init__(self, port, queue_sizes, forwarding_table, log_file):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        print(socket.gethostname())
         self.socket.bind(('localhost', port))
         self.queues = {1: [], 2: [], 3: []}  # Separate queue for each priority
         self.queue_sizes: int = queue_sizes  # Dict with queue sizes for each priority
@@ -87,8 +86,6 @@ class Emulator:
             self.log(f"PACKET DROPPPED: queue for priority {packet.priority} is full.", packet)
 
     def send_packet(self, packet, table, byte_packet):
-        #print('insde send packet')
-
         time.sleep((table.delay)/1000)  # emulator delays before sending
 
         loss_prob = (table.loss_prob)/100
